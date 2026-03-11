@@ -1,17 +1,14 @@
-/**
- * API wrappers for the Express backend.
- * In development, Vite proxies /api/* → http://localhost:3000.
- */
+const BASE = import.meta.env.VITE_API_URL ?? '';
 
 export async function fetchModifierCategories() {
-  const res = await fetch('/api/modifier-categories');
+  const res = await fetch(`${BASE}/api/modifier-categories`);
   if (!res.ok) return [];
   const data = await res.json().catch(() => ({}));
   return data.ok ? (data.categories ?? []) : [];
 }
 
 export async function fetchCatalogItems() {
-  const res = await fetch('/api/catalog-items');
+  const res = await fetch(`${BASE}/api/catalog-items`);
   if (!res.ok) throw new Error('Failed to load menu');
   const data = await res.json();
   if (!data.ok) throw new Error(data.error || 'Failed to load menu');
@@ -19,7 +16,7 @@ export async function fetchCatalogItems() {
 }
 
 export async function submitOrder({ lineItems, customerName, note, pickupMinutes }) {
-  const res = await fetch('/api/create-order', {
+  const res = await fetch(`${BASE}/api/create-order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
