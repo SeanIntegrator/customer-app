@@ -19,7 +19,7 @@ function formatPickupTime(minutes) {
 const stepperBtn = {
   width: 28,
   height: 28,
-  borderRadius: '50%',
+  borderRadius: '48%',
   background: 'rgba(26,46,26,0.08)',
   border: '1.5px solid #d4c0a0',
   color: '#1a2e1a',
