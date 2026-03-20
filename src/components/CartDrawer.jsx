@@ -53,9 +53,10 @@ export default function CartDrawer({ open, onClose }) {
       quantity: String(item.quantity),
     }));
 
+    const DEFAULT_MILKS = ['Full Fat', 'Regular'];
     const autoNote = items
       .map((item) => {
-        const mods = [item.size !== 'Regular' && item.size, item.milk !== 'Full Fat' && item.milk]
+        const mods = [item.size !== 'Regular' && item.size, !DEFAULT_MILKS.includes(item.milk) && item.milk]
           .filter(Boolean)
           .join(', ');
         return mods ? `${item.name}: ${mods}` : item.name;
@@ -222,7 +223,7 @@ export default function CartDrawer({ open, onClose }) {
                               marginTop: 2,
                               margin: '2px 0 0',
                             }}>
-                              {[item.size !== 'Regular' && item.size, item.milk !== 'Full Fat' && item.milk]
+                              {[item.size !== 'Regular' && item.size, !['Full Fat', 'Regular'].includes(item.milk) && item.milk]
                                 .filter(Boolean)
                                 .join(', ') || 'Regular'}
                             </p>

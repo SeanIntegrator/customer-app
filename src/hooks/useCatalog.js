@@ -14,13 +14,21 @@ function getCategoryFromSquareName(squareName) {
 function parseMilkOptions(categories) {
   const milkCat = categories.find((c) => c.name?.toLowerCase().includes('milk'));
   if (!milkCat || !milkCat.modifiers?.length) return null;
-  return milkCat.modifiers.map((m) => ({ name: m.name, delta: m.price ?? 0 }));
+  return milkCat.modifiers.map((m) => ({ name: m.name.trim(), delta: m.price ?? 0 }));
 }
 
 function parseSizeOptions(categories) {
-  const sizeCat = categories.find((c) => c.name?.toLowerCase().includes('size'));
-  if (!sizeCat || !sizeCat.modifiers?.length) return null;
-  return sizeCat.modifiers.map((m) => ({ name: m.name, delta: m.price ?? 0 }));
+  // Look for a "Large" modifier in any category — size options may not have their own list
+  for (const cat of categories) {
+    const large = cat.modifiers?.find((m) => m.name?.trim().toLowerCase() === 'large');
+    if (large) {
+      return [
+        { name: 'Regular', delta: 0 },
+        { name: 'Large', delta: large.price ?? 0 },
+      ];
+    }
+  }
+  return null;
 }
 
 export default function useCatalog() {
