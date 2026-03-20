@@ -1,19 +1,32 @@
 import { useState, useEffect } from 'react';
 import { fetchCatalogItems, fetchModifierCategories } from '../lib/api';
-import { getPriceForItem, getEmojiForItem, getCategoryForItem, MILK_OPTIONS } from '../data/mock';
+import { getPriceForItem, getEmojiForItem, getCategoryForItem, MILK_OPTIONS, SIZE_OPTIONS } from '../data/mock';
+
+function getCategoryFromSquareName(squareName) {
+  if (!squareName) return null;
+  const n = squareName.toLowerCase();
+  if (n.includes('coffee') || n.includes('espresso')) return 'coffee';
+  if (n.includes('tea') || n.includes('matcha') || n.includes('chai')) return 'tea';
+  if (['food', 'pastry', 'pastries', 'bake', 'baked', 'snack', 'cake'].some((w) => n.includes(w))) return 'food';
+  return 'specials';
+}
 
 function parseMilkOptions(categories) {
   const milkCat = categories.find((c) => c.name?.toLowerCase().includes('milk'));
   if (!milkCat || !milkCat.modifiers?.length) return null;
-  return milkCat.modifiers.map((m) => ({
-    name: m.name,
-    delta: m.price ?? 0,
-  }));
+  return milkCat.modifiers.map((m) => ({ name: m.name, delta: m.price ?? 0 }));
+}
+
+function parseSizeOptions(categories) {
+  const sizeCat = categories.find((c) => c.name?.toLowerCase().includes('size'));
+  if (!sizeCat || !sizeCat.modifiers?.length) return null;
+  return sizeCat.modifiers.map((m) => ({ name: m.name, delta: m.price ?? 0 }));
 }
 
 export default function useCatalog() {
   const [items, setItems] = useState([]);
   const [milkOptions, setMilkOptions] = useState(MILK_OPTIONS);
+  const [sizeOptions, setSizeOptions] = useState(SIZE_OPTIONS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -29,12 +42,14 @@ export default function useCatalog() {
           name: item.name,
           price: getPriceForItem(item.name, item.price),
           emoji: getEmojiForItem(item.name),
-          category: getCategoryForItem(item.name),
+          category: getCategoryFromSquareName(item.categoryName) ?? getCategoryForItem(item.name),
         }));
         setItems(enriched);
         setError(null);
-        const fromApi = parseMilkOptions(categories);
-        if (fromApi) setMilkOptions(fromApi);
+        const fromApiMilk = parseMilkOptions(categories);
+        if (fromApiMilk) setMilkOptions(fromApiMilk);
+        const fromApiSizes = parseSizeOptions(categories);
+        if (fromApiSizes) setSizeOptions(fromApiSizes);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -48,5 +63,5 @@ export default function useCatalog() {
     return () => { cancelled = true; };
   }, []);
 
-  return { items, milkOptions, loading, error };
+  return { items, milkOptions, sizeOptions, loading, error };
 }

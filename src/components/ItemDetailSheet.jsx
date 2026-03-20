@@ -4,7 +4,7 @@ import { MILK_OPTIONS, SIZE_OPTIONS } from '../data/mock';
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
-export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOptions = MILK_OPTIONS }) {
+export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOptions = MILK_OPTIONS, sizeOptions = SIZE_OPTIONS }) {
   const [size, setSize] = useState('Regular');
   const [milk, setMilk] = useState('Full Fat');
   const [quantity, setQuantity] = useState(1);
@@ -17,7 +17,7 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
     }
   }, [item?.catalogObjectId]);
 
-  const sizeDelta = SIZE_OPTIONS.find((s) => s.name === size)?.delta ?? 0;
+  const sizeDelta = sizeOptions.find((s) => s.name === size)?.delta ?? 0;
   const milkDelta = milkOptions.find((m) => m.name === milk)?.delta ?? 0;
   const unitPrice = item ? (item.price + sizeDelta + milkDelta) : 0;
   const totalPrice = unitPrice * quantity;
@@ -38,9 +38,7 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
     onClose();
   };
 
-  const isCoffee = ['coffee', 'latte', 'flat white', 'cappuccino', 'americano', 'espresso', 'mocha', 'macchiato', 'cortado', 'chai'].some(
-    (w) => item?.name?.toLowerCase().includes(w)
-  );
+  const isCoffee = item?.category === 'coffee';
 
   const sectionLabel = {
     fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -156,7 +154,7 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
                 <div style={{ marginBottom: 20 }}>
                   <span style={sectionLabel}>Size</span>
                   <div style={{ display: 'flex', gap: 8 }}>
-                    {SIZE_OPTIONS.map((opt) => (
+                    {sizeOptions.map((opt) => (
                       <button
                         key={opt.name}
                         onClick={() => setSize(opt.name)}

@@ -12,7 +12,7 @@ const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 
 export default function Order() {
   const location = useLocation();
-  const { items: catalogItems, milkOptions, loading, error } = useCatalog();
+  const { items: catalogItems, milkOptions, sizeOptions, loading, error } = useCatalog();
   const { addItem, totalItems, subtotal } = useCart();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
@@ -268,6 +268,7 @@ export default function Order() {
         onClose={() => setSelectedItem(null)}
         onAddToCart={handleAddToCart}
         milkOptions={milkOptions}
+        sizeOptions={sizeOptions}
       />
 
       {/* Cart drawer */}
