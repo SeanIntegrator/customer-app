@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { USER, EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
+import { useCart } from '../context/CartContext';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -303,6 +304,7 @@ const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'
 
 export default function Home() {
   const navigate = useNavigate();
+  const { activeOrder } = useCart();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -584,6 +586,68 @@ export default function Home() {
           </div>
         </motion.button>
       </div>
+
+      {/* ── ACTIVE ORDER BANNER ───────────────────────────────────────── */}
+      <AnimatePresence>
+        {activeOrder && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.97 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+            onClick={() => navigate('/profile')}
+            style={{ margin: '20px 18px 0', cursor: 'pointer' }}
+          >
+            <div style={{
+              background: 'linear-gradient(138deg, #0e1c0e 0%, #1a2e1a 60%, #223828 100%)',
+              borderRadius: 22,
+              padding: '16px 18px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 14,
+              position: 'relative',
+              overflow: 'hidden',
+              boxShadow: '0 6px 28px rgba(0,0,0,0.22), 0 1px 6px rgba(0,0,0,0.1)',
+              border: '1px solid rgba(200,144,42,0.22)',
+            }}>
+              {/* Ambient amber glow */}
+              <motion.div
+                style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(200,144,42,0.28) 0%, transparent 65%)', pointerEvents: 'none' }}
+                animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+              />
+
+              {/* Spinner */}
+              <div style={{ flexShrink: 0, position: 'relative' }}>
+                <motion.div
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                  style={{ width: 40, height: 40 }}
+                >
+                  <svg viewBox="0 0 40 40" fill="none" style={{ width: 40, height: 40 }}>
+                    <circle cx="20" cy="20" r="17" stroke="rgba(200,144,42,0.2)" strokeWidth="3" />
+                    <path d="M20 3 A17 17 0 0 1 37 20" stroke="#c8902a" strokeWidth="3" strokeLinecap="round" />
+                  </svg>
+                </motion.div>
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>☕</div>
+              </div>
+
+              {/* Text */}
+              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#f0e6d0', letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 3 }}>
+                  Order being prepared
+                </p>
+                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(240,230,208,0.55)', lineHeight: 1.3 }}>
+                  {activeOrder.pickupMinutes === 0 ? 'Ready as soon as possible' : `Pickup in ~${activeOrder.pickupMinutes} mins`}
+                </p>
+              </div>
+
+              {/* Chevron */}
+              <div style={{ flexShrink: 0, color: 'rgba(200,144,42,0.7)', fontSize: 14, position: 'relative' }}>›</div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── SCROLLABLE CONTENT ────────────────────────────────────────── */}
       <div style={{ padding: '40px 18px 60px' }}>

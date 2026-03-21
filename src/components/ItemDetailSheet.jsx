@@ -30,6 +30,7 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
       catalogObjectId: item.catalogObjectId,
       name: item.name,
       emoji: item.emoji,
+      category: item.category,
       size,
       milk,
       quantity,

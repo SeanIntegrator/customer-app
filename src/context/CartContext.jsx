@@ -4,6 +4,8 @@ const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
+  const [activeOrder, setActiveOrder] = useState(null);
+  const clearActiveOrder = useCallback(() => setActiveOrder(null), []);
 
   const addItem = useCallback((item) => {
     setItems((prev) => {
@@ -13,11 +15,11 @@ export function CartProvider({ children }) {
       if (existing) {
         return prev.map((i) =>
           `${i.catalogObjectId}|${i.size}|${i.milk}` === key
-            ? { ...i, quantity: i.quantity + 1 }
+            ? { ...i, quantity: i.quantity + (item.quantity ?? 1) }
             : i
         );
       }
-      return [...prev, { ...item, quantity: 1 }];
+      return [...prev, { ...item, quantity: item.quantity ?? 1 }];
     });
   }, []);
 
@@ -39,7 +41,7 @@ export function CartProvider({ children }) {
   const subtotal = items.reduce((s, i) => s + i.totalPrice * i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, totalItems, subtotal }}>
+    <CartContext.Provider value={{ items, addItem, removeItem, updateQuantity, clearCart, totalItems, subtotal, activeOrder, setActiveOrder, clearActiveOrder }}>
       {children}
     </CartContext.Provider>
   );

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { submitOrder } from '../lib/api';
@@ -32,7 +33,8 @@ const stepperBtn = {
 };
 
 export default function CartDrawer({ open, onClose }) {
-  const { items, updateQuantity, clearCart, subtotal } = useCart();
+  const navigate = useNavigate();
+  const { items, updateQuantity, clearCart, subtotal, setActiveOrder } = useCart();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -67,13 +69,21 @@ export default function CartDrawer({ open, onClose }) {
       ? `${autoNote} | Note: ${orderNote.trim()}`
       : autoNote;
 
+    const orderSnapshot = {
+      items: items.map((i) => ({ name: i.name, emoji: i.emoji, quantity: i.quantity, size: i.size, milk: i.milk, category: i.category })),
+      pickupMinutes,
+      total: subtotal,
+      placedAt: Date.now(),
+    };
+
     try {
-      await submitOrder({
+      const data = await submitOrder({
         lineItems,
         customerName: USER.name,
         note: fullNote,
         pickupMinutes,
       });
+      setActiveOrder({ ...orderSnapshot, orderId: data.order_id });
       clearCart();
       setOrderSuccess(true);
     } catch (err) {
@@ -84,10 +94,9 @@ export default function CartDrawer({ open, onClose }) {
   };
 
   const handleSuccessDone = () => {
-    setOrderSuccess(false);
     setOrderNote('');
     setPickupMinutes(10);
-    onClose();
+    navigate('/');
   };
 
   return (
@@ -111,7 +120,7 @@ export default function CartDrawer({ open, onClose }) {
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
           >
             {orderSuccess ? (
-              <OrderSuccess onDone={handleSuccessDone} />
+              <OrderSuccess onDone={handleSuccessDone} pickupMinutes={pickupMinutes} />
             ) : (
               <>
                 {/* Dark green combined header */}
@@ -225,7 +234,7 @@ export default function CartDrawer({ open, onClose }) {
                             }}>
                               {[item.size !== 'Regular' && item.size, !['Full Fat', 'Regular'].includes(item.milk) && item.milk]
                                 .filter(Boolean)
-                                .join(', ') || 'Regular'}
+                                .join(', ') || (item.category === 'coffee' ? 'Regular' : null)}
                             </p>
                             <p style={{
                               fontFamily: 'Plus Jakarta Sans, sans-serif',
