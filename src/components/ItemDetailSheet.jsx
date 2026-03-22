@@ -1,30 +1,40 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MILK_OPTIONS, SIZE_OPTIONS } from '../data/mock';
+import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS, getSyrupChipColors } from '../data/mock';
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
-export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOptions = MILK_OPTIONS, sizeOptions = SIZE_OPTIONS }) {
+export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOptions = MILK_OPTIONS, sizeOptions = SIZE_OPTIONS, syrupOptions = SYRUP_OPTIONS, alterationOptions = [] }) {
   const [size, setSize] = useState('Regular');
   const [milk, setMilk] = useState('Full Fat');
+  const [syrup, setSyrup] = useState(null);
+  const [alterations, setAlterations] = useState([]);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     if (item) {
       setSize('Regular');
       setMilk(milkOptions[0]?.name ?? 'Full Fat');
+      setSyrup(null);
+      setAlterations([]);
       setQuantity(1);
     }
   }, [item?.catalogObjectId]);
 
+  const toggleAlteration = (name) => {
+    setAlterations((prev) => prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]);
+  };
+
   const sizeDelta = sizeOptions.find((s) => s.name === size)?.delta ?? 0;
   const milkDelta = milkOptions.find((m) => m.name === milk)?.delta ?? 0;
-  const unitPrice = item ? (item.price + sizeDelta + milkDelta) : 0;
+  const syrupDelta = syrup ? (syrupOptions.find((s) => s.name === syrup)?.delta ?? 0) : 0;
+  const alterationsDelta = alterations.reduce((sum, name) => sum + (alterationOptions.find((a) => a.name === name)?.delta ?? 0), 0);
+  const unitPrice = item ? (item.price + sizeDelta + milkDelta + syrupDelta + alterationsDelta) : 0;
   const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
     if (!item) return;
-    const cartId = `${item.catalogObjectId}|${size}|${milk}|${Date.now()}`;
+    const cartId = `${item.catalogObjectId}|${size}|${milk}|${syrup ?? 'none'}|${alterations.join(',')}|${Date.now()}`;
     onAddToCart({
       cartId,
       catalogObjectId: item.catalogObjectId,
@@ -33,13 +43,15 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
       category: item.category,
       size,
       milk,
+      syrup,
+      alterations,
       quantity,
       totalPrice: unitPrice,
     });
     onClose();
   };
 
-  const isCoffee = item?.category === 'coffee';
+  const isCoffee = item?.showCoffeeOptions ?? false;
 
   const sectionLabel = {
     fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -210,6 +222,90 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
                         )}
                       </button>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Syrup picker */}
+              {isCoffee && syrupOptions.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <span style={sectionLabel}>Syrup</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    <button
+                      onClick={() => setSyrup(null)}
+                      style={{
+                        padding: '9px 16px',
+                        borderRadius: 100,
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        ...(syrup === null ? activeOption : inactiveOption),
+                      }}
+                    >
+                      None
+                    </button>
+                    {syrupOptions.map((opt) => {
+                      const colors = getSyrupChipColors(opt.name);
+                      const isActive = syrup === opt.name;
+                      return (
+                        <button
+                          key={opt.name}
+                          onClick={() => setSyrup(opt.name)}
+                          style={{
+                            padding: '9px 16px',
+                            borderRadius: 100,
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            border: isActive ? 'none' : '1.5px solid #d4c0a0',
+                            background: isActive ? colors.bg : 'rgba(240,230,208,0.6)',
+                            color: isActive ? colors.text : '#6a5a48',
+                          }}
+                        >
+                          {opt.name.replace(/\s*syrup\s*/i, '').trim()}
+                          {opt.delta > 0 && (
+                            <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Alterations */}
+              {isCoffee && alterationOptions.length > 0 && (
+                <div style={{ marginBottom: 20 }}>
+                  <span style={sectionLabel}>Alterations</span>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {alterationOptions.map((opt) => {
+                      const isActive = alterations.includes(opt.name);
+                      return (
+                        <button
+                          key={opt.name}
+                          onClick={() => toggleAlteration(opt.name)}
+                          style={{
+                            padding: '9px 16px',
+                            borderRadius: 100,
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                            ...(isActive ? activeOption : inactiveOption),
+                          }}
+                        >
+                          {opt.name}
+                          {opt.delta > 0 && (
+                            <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}

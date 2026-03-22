@@ -216,6 +216,35 @@ export const USUAL_ORDER = [
   },
 ];
 
+// Syrup chip colour palette — keyword-matched by modifier name from Square
+const SYRUP_CHIP_COLORS = {
+  caramel:         { bg: '#7B4A1E', text: '#F5DEB3' },
+  vanilla:         { bg: '#C8A96E', text: '#3D2B1F' },
+  hazelnut:        { bg: '#5C3317', text: '#F0DEC8' },
+  'white chocolate': { bg: '#EED8A8', text: '#4A3520' },
+  chocolate:       { bg: '#3D2010', text: '#F0D0A0' },
+  strawberry:      { bg: '#B22040', text: '#FFE8EC' },
+  raspberry:       { bg: '#8B1A4A', text: '#FFD8E8' },
+  blueberry:       { bg: '#2D1B69', text: '#C8B8FF' },
+  lavender:        { bg: '#7B5EA7', text: '#F0E8FF' },
+  mint:            { bg: '#2E7D5E', text: '#E0F5EC' },
+  cinnamon:        { bg: '#A0522D', text: '#FAEBD7' },
+  pumpkin:         { bg: '#C05A1A', text: '#FFE4C4' },
+  coconut:         { bg: '#8B7355', text: '#FFF8F0' },
+  default:         { bg: '#6A5A48', text: '#F0E6D0' },
+};
+
+export function getSyrupChipColors(name) {
+  const n = (name || '').toLowerCase();
+  for (const [key, colors] of Object.entries(SYRUP_CHIP_COLORS)) {
+    if (key !== 'default' && n.includes(key)) return colors;
+  }
+  return SYRUP_CHIP_COLORS.default;
+}
+
+// Fallback syrup options — empty so section is hidden when API unavailable
+export const SYRUP_OPTIONS = [];
+
 // Size modifiers with price delta (pence)
 export const SIZE_OPTIONS = [
   { name: 'Regular', delta: 0 },

@@ -9,12 +9,13 @@ export function CartProvider({ children }) {
 
   const addItem = useCallback((item) => {
     setItems((prev) => {
-      // Match by catalogObjectId + size + milk
-      const key = `${item.catalogObjectId}|${item.size}|${item.milk}`;
-      const existing = prev.find((i) => `${i.catalogObjectId}|${i.size}|${i.milk}` === key);
+      // Match by catalogObjectId + size + milk + syrup
+      const altKey = (i) => (i.alterations ?? []).slice().sort().join(',');
+      const key = `${item.catalogObjectId}|${item.size}|${item.milk}|${item.syrup ?? 'none'}|${altKey(item)}`;
+      const existing = prev.find((i) => `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}` === key);
       if (existing) {
         return prev.map((i) =>
-          `${i.catalogObjectId}|${i.size}|${i.milk}` === key
+          `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}` === key
             ? { ...i, quantity: i.quantity + (item.quantity ?? 1) }
             : i
         );

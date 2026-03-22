@@ -58,7 +58,12 @@ export default function CartDrawer({ open, onClose }) {
     const DEFAULT_MILKS = ['Full Fat', 'Regular'];
     const autoNote = items
       .map((item) => {
-        const mods = [item.size !== 'Regular' && item.size, !DEFAULT_MILKS.includes(item.milk) && item.milk]
+        const mods = [
+          item.size !== 'Regular' && item.size,
+          !DEFAULT_MILKS.includes(item.milk) && item.milk,
+          item.syrup && `${item.syrup} syrup`,
+          ...(item.alterations ?? []),
+        ]
           .filter(Boolean)
           .join(', ');
         return mods ? `${item.name}: ${mods}` : item.name;
@@ -116,7 +121,7 @@ export default function CartDrawer({ open, onClose }) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 38 }}
-            className="fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col h-[70vh]"
+            className="fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col max-h-[90vh]"
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
           >
             {orderSuccess ? (
@@ -232,9 +237,12 @@ export default function CartDrawer({ open, onClose }) {
                               marginTop: 2,
                               margin: '2px 0 0',
                             }}>
-                              {[item.size !== 'Regular' && item.size, !['Full Fat', 'Regular'].includes(item.milk) && item.milk]
-                                .filter(Boolean)
-                                .join(', ') || (item.category === 'coffee' ? 'Regular' : null)}
+                              {[
+                                item.size !== 'Regular' && item.size,
+                                !['Full Fat', 'Regular'].includes(item.milk) && item.milk,
+                                item.syrup && `${item.syrup} syrup`,
+                                ...(item.alterations ?? []),
+                              ].filter(Boolean).join(', ') || (item.category === 'coffee' ? 'Regular' : null)}
                             </p>
                             <p style={{
                               fontFamily: 'Plus Jakarta Sans, sans-serif',

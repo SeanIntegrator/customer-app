@@ -1,14 +1,21 @@
 import { useState, useEffect } from 'react';
 import { fetchCatalogItems, fetchModifierCategories } from '../lib/api';
-import { getPriceForItem, getEmojiForItem, getCategoryForItem, MILK_OPTIONS, SIZE_OPTIONS } from '../data/mock';
+import { getPriceForItem, getEmojiForItem, MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from '../data/mock';
 
-function getCategoryFromSquareName(squareName) {
-  if (!squareName) return null;
-  const n = squareName.toLowerCase();
-  if (n.includes('coffee') || n.includes('espresso')) return 'coffee';
-  if (n.includes('tea') || n.includes('matcha') || n.includes('chai')) return 'tea';
-  if (['food', 'pastry', 'pastries', 'bake', 'baked', 'snack', 'cake'].some((w) => n.includes(w))) return 'food';
-  return 'specials';
+// Convert a Square category name to a stable URL-safe slug for filtering
+function slugify(name) {
+  if (!name) return 'other';
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+// Espresso-based drinks get milk/syrup/alteration pickers.
+// Check the Square CATEGORY name, not the item name, to avoid
+// misclassifying "Matcha Latte" (latte → coffee) or missing "Long Black".
+function isCoffeeCategory(squareCategoryName) {
+  if (!squareCategoryName) return false;
+  const n = squareCategoryName.toLowerCase();
+  if (['retail', 'tea', 'matcha', 'chai', 'cold', 'food', 'pastry', 'pastries'].some((w) => n.includes(w))) return false;
+  return ['coffee', 'espresso', 'hot drink', 'latte'].some((w) => n.includes(w));
 }
 
 function parseMilkOptions(categories) {
@@ -17,8 +24,33 @@ function parseMilkOptions(categories) {
   return milkCat.modifiers.map((m) => ({ name: m.name.trim(), delta: m.price ?? 0 }));
 }
 
+function parseSyrupOptions(categories) {
+  const syrups = [];
+  for (const cat of categories) {
+    for (const m of (cat.modifiers || [])) {
+      if (m.name?.toLowerCase().includes('syrup')) {
+        syrups.push({ name: m.name.trim(), delta: m.price ?? 0 });
+      }
+    }
+  }
+  return syrups.length > 0 ? syrups : null;
+}
+
+function parseAlterationOptions(categories) {
+  const ALTERATION_KEYWORDS = ['extra shot', 'decaf'];
+  const alterations = [];
+  for (const cat of categories) {
+    for (const m of (cat.modifiers || [])) {
+      const nameLower = m.name?.toLowerCase().trim() ?? '';
+      if (ALTERATION_KEYWORDS.some((kw) => nameLower.includes(kw))) {
+        alterations.push({ name: m.name.trim(), delta: m.price ?? 0 });
+      }
+    }
+  }
+  return alterations.length > 0 ? alterations : null;
+}
+
 function parseSizeOptions(categories) {
-  // Look for a "Large" modifier in any category — size options may not have their own list
   for (const cat of categories) {
     const large = cat.modifiers?.find((m) => m.name?.trim().toLowerCase() === 'large');
     if (large) {
@@ -33,8 +65,11 @@ function parseSizeOptions(categories) {
 
 export default function useCatalog() {
   const [items, setItems] = useState([]);
+  const [categories, setCategories] = useState([{ id: 'all', label: 'All' }]);
   const [milkOptions, setMilkOptions] = useState(MILK_OPTIONS);
   const [sizeOptions, setSizeOptions] = useState(SIZE_OPTIONS);
+  const [syrupOptions, setSyrupOptions] = useState(SYRUP_OPTIONS);
+  const [alterationOptions, setAlterationOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -43,21 +78,45 @@ export default function useCatalog() {
     setLoading(true);
 
     Promise.all([fetchCatalogItems(), fetchModifierCategories()])
-      .then(([raw, categories]) => {
+      .then(([raw, modifierCategories]) => {
         if (cancelled) return;
-        const enriched = raw.map((item) => ({
-          catalogObjectId: item.id,
-          name: item.name,
-          price: getPriceForItem(item.name, item.price),
-          emoji: getEmojiForItem(item.name),
-          category: getCategoryFromSquareName(item.categoryName) ?? getCategoryForItem(item.name),
-        }));
+
+        const enriched = raw.map((item) => {
+          const squareCategoryName = item.categoryName?.trim() ?? null;
+          return {
+            catalogObjectId: item.id,
+            name: item.name,
+            price: getPriceForItem(item.name, item.price),
+            emoji: getEmojiForItem(item.name),
+            squareCategoryName,
+            category: slugify(squareCategoryName),
+            showCoffeeOptions: isCoffeeCategory(squareCategoryName),
+          };
+        });
+
         setItems(enriched);
         setError(null);
-        const fromApiMilk = parseMilkOptions(categories);
+
+        // Build dynamic category tabs from the unique Square category names,
+        // preserving their natural order of first appearance in the catalog.
+        const seen = new Set();
+        const dynamicCategories = [{ id: 'all', label: 'All' }];
+        for (const item of enriched) {
+          if (item.squareCategoryName && !seen.has(item.category)) {
+            seen.add(item.category);
+            dynamicCategories.push({ id: item.category, label: item.squareCategoryName });
+          }
+        }
+        setCategories(dynamicCategories);
+
+        const fromApiMilk = parseMilkOptions(modifierCategories);
         if (fromApiMilk) setMilkOptions(fromApiMilk);
-        const fromApiSizes = parseSizeOptions(categories);
+        const fromApiSizes = parseSizeOptions(modifierCategories);
         if (fromApiSizes) setSizeOptions(fromApiSizes);
+        const fromApiSyrups = parseSyrupOptions(modifierCategories);
+        if (fromApiSyrups) setSyrupOptions(fromApiSyrups);
+        const fromApiAlterations = parseAlterationOptions(modifierCategories);
+        if (fromApiAlterations) setAlterationOptions(fromApiAlterations);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -71,5 +130,5 @@ export default function useCatalog() {
     return () => { cancelled = true; };
   }, []);
 
-  return { items, milkOptions, sizeOptions, loading, error };
+  return { items, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error };
 }

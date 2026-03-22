@@ -6,13 +6,12 @@ import useCatalog from '../hooks/useCatalog';
 import MenuItem from '../components/MenuItem';
 import ItemDetailSheet from '../components/ItemDetailSheet';
 import CartDrawer from '../components/CartDrawer';
-import { CATEGORIES } from '../data/mock';
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
 export default function Order() {
   const location = useLocation();
-  const { items: catalogItems, milkOptions, sizeOptions, loading, error } = useCatalog();
+  const { items: catalogItems, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error } = useCatalog();
   const { addItem, totalItems, subtotal } = useCart();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
@@ -31,7 +30,7 @@ export default function Order() {
       ? catalogItems
       : catalogItems.filter((i) => i.category === activeCategory);
 
-  const counts = CATEGORIES.reduce((acc, cat) => {
+  const counts = categories.reduce((acc, cat) => {
     acc[cat.id] = cat.id === 'all' ? catalogItems.length : catalogItems.filter((i) => i.category === cat.id).length;
     return acc;
   }, {});
@@ -103,7 +102,7 @@ export default function Order() {
           marginTop: 6,
           position: 'relative',
         }}>
-          Pickup in ~15 minutes
+          Pickup in ~10 minutes
         </p>
       </div>
 
@@ -112,7 +111,7 @@ export default function Order() {
         className="flex gap-2 overflow-x-auto scrollbar-hide"
         style={{ padding: '14px 20px', flexShrink: 0 }}
       >
-        {CATEGORIES.filter((c) => counts[c.id] > 0 || c.id === 'all').map((cat) => (
+        {categories.filter((c) => counts[c.id] > 0 || c.id === 'all').map((cat) => (
           <button
             key={cat.id}
             onClick={() => setActiveCategory(cat.id)}
@@ -269,6 +268,8 @@ export default function Order() {
         onAddToCart={handleAddToCart}
         milkOptions={milkOptions}
         sizeOptions={sizeOptions}
+        syrupOptions={syrupOptions}
+        alterationOptions={alterationOptions}
       />
 
       {/* Cart drawer */}
