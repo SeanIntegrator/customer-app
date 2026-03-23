@@ -319,7 +319,7 @@ export default function Home() {
   const [showEventSignIn, setShowEventSignIn] = useState(false);
 
   const displayName = user?.displayName ?? 'Guest';
-  const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : 'there.';
+  const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : "Welcome.";
   const profileInitials = user ? initialsFromName(user.displayName) : '?';
 
   const toggleEvent = (id) => {
@@ -346,17 +346,17 @@ export default function Home() {
       className="h-full overflow-y-auto scrollbar-hide"
       style={{ background: '#f0e6d0' }}
     >
-      {/* ── HERO — 65vh, CTA bridges the fold ─────────────────────────── */}
+      {/* ── HERO — shorter on small screens; CTA bridges the fold ─────── */}
       <div
         style={{
           position: 'relative',
           overflow: 'hidden',
           background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 50%, #223828 100%)',
-          height: '65vh',
+          height: 'clamp(300px, 60vh, 620px)',
           display: 'flex',
           flexDirection: 'column',
-          paddingTop: 44,
-          paddingBottom: 44,
+          paddingTop: 40,
+          paddingBottom: 32,
         }}
       >
         {/* Grain */}
@@ -456,15 +456,15 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Flex spacer */}
-        <div style={{ flex: 0.4 }} />
+        {/* Flex spacer — a bit tighter so loyalty + promo sit comfortably */}
+        <div style={{ flex: 0.32 }} />
 
                 {/* ── LOYALTY CARD — gold physical card style ──────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.22, type: 'spring', stiffness: 260, damping: 28 }}
-          style={{ padding: '0 18px', marginBottom: 10, position: 'relative', zIndex: 1 }}
+          style={{ padding: '0 18px', marginBottom: 26, position: 'relative', zIndex: 1 }}
         >
           <motion.div
             whileTap={{ scale: 0.982 }}
@@ -529,7 +529,7 @@ export default function Home() {
         </motion.div>
 
         {/* BOTTOM SUMMARY: booked events + promo */}
-        <div style={{ position: 'relative', padding: '0 18px 22px', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ position: 'relative', padding: '0 18px 28px', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
 
       
 
@@ -588,7 +588,7 @@ export default function Home() {
       </div>
 
       {/* ── BRIDGING CTA or ACTIVE ORDER — straddles hero/cream boundary ── */}
-      <div style={{ margin: '-30px 18px 0', position: 'relative', zIndex: 10 }}>
+      <div style={{ margin: '-42px 18px 0', position: 'relative', zIndex: 10 }}>
         <AnimatePresence mode="wait">
           {activeOrder ? (
             <motion.div
@@ -720,8 +720,8 @@ export default function Home() {
         </AnimatePresence>
       </div>
 
-      {/* ── SCROLLABLE CONTENT ────────────────────────────────────────── */}
-      <div style={{ padding: '40px 18px 60px' }}>
+      {/* ── SCROLLABLE CONTENT (extra top pad balances deeper CTA overlap) ─ */}
+      <div style={{ padding: '48px 18px 60px' }}>
 
 
 
