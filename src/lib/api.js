@@ -15,8 +15,11 @@ export async function fetchCatalogItems() {
   return data.items ?? [];
 }
 
-export async function submitOrder({ lineItems, customerName, note, pickupMinutes }) {
-  const res = await fetch(`${BASE}/api/create-order`, {
+export async function submitOrder(
+  { lineItems, customerName, note, pickupMinutes },
+  fetchImpl = fetch
+) {
+  const res = await fetchImpl(`${BASE}/api/customer/create-order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

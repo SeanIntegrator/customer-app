@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { USER, ORDER_HISTORY, EVENTS, PAST_EVENTS, USUAL_ORDER } from '../data/mock';
+import { DEMO_LOYALTY, ORDER_HISTORY, EVENTS, PAST_EVENTS, USUAL_ORDER } from '../data/mock';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { initialsFromName } from '../lib/userDisplay';
+import SignInButton from '../components/SignInButton';
 
 const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E")`;
 
@@ -113,6 +116,7 @@ function SectionHead({ label, title, action }) {
 
 export default function Profile() {
   const { activeOrder, clearActiveOrder } = useCart();
+  const { user, isAuthenticated, logout, loading } = useAuth();
   const [usual, setUsual] = useState(USUAL_ORDER);
   const [editingUsual, setEditingUsual] = useState(false);
   const [expandedOrder, setExpandedOrder] = useState(null);
@@ -120,6 +124,9 @@ export default function Profile() {
   const [events, setEvents] = useState(EVENTS);
 
   const upcomingEvents = events.filter((e) => e.registered);
+  const displayName = user?.displayName ?? 'Guest';
+  const profileInitials = user ? initialsFromName(user.displayName) : 'G';
+  const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : 'Friend.';
   const handleRate = (id, stars) => setRatings((r) => ({ ...r, [id]: stars }));
   const removeUsual = (catalogObjectId) => setUsual((u) => u.filter((i) => i.catalogObjectId !== catalogObjectId));
   const toggleEvent = (id) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
@@ -180,9 +187,28 @@ export default function Profile() {
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 280, damping: 22, delay: 0.08 }}
-              style={{ width: 68, height: 68, borderRadius: '50%', background: 'linear-gradient(140deg, #c8902a 0%, #deb040 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, Georgia, serif', fontSize: 28, fontWeight: 900, color: '#122012', boxShadow: '0 0 0 3px rgba(200,144,42,0.25), 0 6px 24px rgba(200,144,42,0.3)', flexShrink: 0 }}
+              style={{
+                width: 68,
+                height: 68,
+                borderRadius: '50%',
+                background: user?.avatarUrl ? 'transparent' : 'linear-gradient(140deg, #c8902a 0%, #deb040 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: 'Fraunces, Georgia, serif',
+                fontSize: 28,
+                fontWeight: 900,
+                color: '#122012',
+                boxShadow: '0 0 0 3px rgba(200,144,42,0.25), 0 6px 24px rgba(200,144,42,0.3)',
+                flexShrink: 0,
+                overflow: 'hidden',
+              }}
             >
-              {USER.initials}
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                profileInitials
+              )}
             </motion.div>
 
             <motion.div
@@ -191,10 +217,12 @@ export default function Profile() {
               transition={{ delay: 0.12, type: 'spring', stiffness: 300, damping: 28 }}
             >
               <h1 style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 42, fontWeight: 900, color: '#f0e6d0', letterSpacing: '-0.035em', lineHeight: 0.95, marginBottom: 6 }}>
-                {USER.name}.
+                {heroFirstName}
               </h1>
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(240,230,208,0.5)' }}>
-                Member since {USER.memberSince}
+                {isAuthenticated
+                  ? `Demo loyalty · Member since ${DEMO_LOYALTY.memberSince}`
+                  : 'Sign in with Google to sync orders and rewards'}
               </p>
             </motion.div>
           </div>
@@ -207,8 +235,8 @@ export default function Profile() {
             style={{ display: 'flex', gap: 8 }}
           >
             {[
-              { label: 'Orders', value: USER.totalOrders },
-              { label: 'Stamps', value: `${USER.stamps}/${USER.stampsGoal}` },
+              { label: 'Orders', value: DEMO_LOYALTY.totalOrders },
+              { label: 'Stamps', value: `${DEMO_LOYALTY.stamps}/${DEMO_LOYALTY.stampsGoal}` },
               { label: 'Events', value: PAST_EVENTS.length + upcomingEvents.length },
             ].map(({ label, value }) => (
               <div key={label} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 100, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -217,11 +245,77 @@ export default function Profile() {
               </div>
             ))}
           </motion.div>
+
+          {isAuthenticated && (
+            <motion.button
+              type="button"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.28 }}
+              onClick={() => logout()}
+              style={{
+                marginTop: 16,
+                alignSelf: 'flex-start',
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: 100,
+                padding: '8px 16px',
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: 11,
+                fontWeight: 700,
+                color: 'rgba(240,230,208,0.65)',
+                cursor: 'pointer',
+                letterSpacing: '0.04em',
+              }}
+            >
+              Sign out
+            </motion.button>
+          )}
         </div>
       </div>
 
       {/* ── PAGE BODY ─────────────────────────────────────────────── */}
       <div style={{ padding: '32px 18px 72px', display: 'flex', flexDirection: 'column', gap: 36 }}>
+
+        {!loading && !isAuthenticated && (
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: 'linear-gradient(148deg, #fef9f0, #f5ead8)',
+              border: '1.5px solid #e0d0b0',
+              borderRadius: 20,
+              padding: '20px 18px',
+              textAlign: 'center',
+            }}
+          >
+            <p
+              style={{
+                fontFamily: 'Fraunces, Georgia, serif',
+                fontSize: 17,
+                fontWeight: 800,
+                color: '#1a2e1a',
+                margin: '0 0 6px',
+              }}
+            >
+              Sign in to get started
+            </p>
+            <p
+              style={{
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: 12,
+                color: 'rgba(26,46,26,0.5)',
+                margin: '0 0 16px',
+                lineHeight: 1.45,
+              }}
+            >
+              Place orders, save your usual, and join events with your Google account.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <SignInButton />
+            </div>
+          </motion.section>
+        )}
 
         {/* ── CURRENT ORDER ───────────────────────────────────────── */}
         <AnimatePresence>
@@ -333,7 +427,7 @@ export default function Profile() {
                   Clay &amp; Bean · Loyalty Card
                 </p>
                 <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 800, color: '#1a2e1a', letterSpacing: '-0.01em' }}>
-                  {USER.name}
+                  {displayName}
                 </p>
               </div>
 
@@ -342,8 +436,8 @@ export default function Profile() {
                 {/* Left: stamps + progress */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6, marginBottom: 12 }}>
-                    {Array.from({ length: USER.stampsGoal }).map((_, i) => {
-                      const filled = i < USER.stamps;
+                    {Array.from({ length: DEMO_LOYALTY.stampsGoal }).map((_, i) => {
+                      const filled = i < DEMO_LOYALTY.stamps;
                       return (
                         <motion.div
                           key={i}
@@ -359,10 +453,10 @@ export default function Profile() {
                   </div>
 
                   <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
-                    {USER.stamps} of {USER.stampsGoal} stamps collected
+                    {DEMO_LOYALTY.stamps} of {DEMO_LOYALTY.stampsGoal} stamps collected
                   </p>
                   <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.5)' }}>
-                    {USER.stampsGoal - USER.stamps} until your free coffee ☕
+                    {DEMO_LOYALTY.stampsGoal - DEMO_LOYALTY.stamps} until your free coffee ☕
                   </p>
                   <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.35)', marginTop: 8, fontStyle: 'italic' }}>
                     Earn a stamp with every coffee purchase

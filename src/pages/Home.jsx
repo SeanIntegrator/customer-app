@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { USER, EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
+import { DEMO_LOYALTY, EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import { initialsFromName } from '../lib/userDisplay';
+import SignInButton from '../components/SignInButton';
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -47,7 +50,7 @@ function Blob({ style }) {
 }
 
 function Steam() {
-  const wisps = [{ x: -7, delay: 0 }, { x: 1, delay: 0.45 }, { x: 9, delay: 0.2 }];
+  const wisps = [{ x: 7, delay: 0 }, { x: 15, delay: 0.45 }, { x: 23, delay: 0.2 }];
   return (
     <div style={{ position: 'absolute', bottom: '100%', left: '50%', transform: 'translateX(-50%)', width: 36, height: 28, pointerEvents: 'none' }}>
       {wisps.map((s, i) => (
@@ -104,7 +107,7 @@ function QRCode({ size = 160 }) {
 
 // ── QR MODAL ────────────────────────────────────────────────────────────────
 
-function QRModal({ onClose }) {
+function QRModal({ onClose, displayName, initials, avatarUrl, stamps, stampsGoal, memberSubline }) {
   const grain = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E")`;
   return (
     <motion.div
@@ -144,15 +147,19 @@ function QRModal({ onClose }) {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '14px 16px', marginBottom: 18 }}>
-            <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'linear-gradient(140deg, #c8902a, #deb040)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 800, color: '#122012', flexShrink: 0 }}>
-              {USER.initials}
+            <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarUrl ? 'transparent' : 'linear-gradient(140deg, #c8902a, #deb040)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 800, color: '#122012', flexShrink: 0, overflow: 'hidden' }}>
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                initials
+              )}
             </div>
             <div style={{ flex: 1 }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 700, color: '#f0e6d0', lineHeight: 1.2 }}>{USER.name}</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(240,230,208,0.45)' }}>Member since {USER.memberSince}</p>
+              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 700, color: '#f0e6d0', lineHeight: 1.2 }}>{displayName}</p>
+              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(240,230,208,0.45)' }}>{memberSubline}</p>
             </div>
             <div style={{ textAlign: 'right', flexShrink: 0 }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 24, fontWeight: 900, color: '#c8902a', lineHeight: 1 }}>{USER.stamps}</p>
+              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 24, fontWeight: 900, color: '#c8902a', lineHeight: 1 }}>{stamps}</p>
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(240,230,208,0.45)' }}>stamps</p>
             </div>
           </div>
@@ -305,12 +312,26 @@ const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'
 export default function Home() {
   const navigate = useNavigate();
   const { activeOrder } = useCart();
+  const { user, isAuthenticated } = useAuth();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
   const [showQR, setShowQR] = useState(false);
+  const [showEventSignIn, setShowEventSignIn] = useState(false);
+
+  const displayName = user?.displayName ?? 'Guest';
+  const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : 'there.';
+  const profileInitials = user ? initialsFromName(user.displayName) : '?';
 
   const toggleEvent = (id) => {
     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
+  };
+
+  const handleEventToggle = (id) => {
+    if (!isAuthenticated) {
+      setShowEventSignIn(true);
+      return;
+    }
+    toggleEvent(id);
   };
 
   const promo = PROMOTIONS[0];
@@ -397,7 +418,7 @@ export default function Home() {
                 ✦ {getGreeting()},
               </p>
               <h1 style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 50, fontWeight: 900, color: '#f0e6d0', letterSpacing: '-0.035em', lineHeight: 0.92, textShadow: '0 2px 30px rgba(0,0,0,0.3)' }}>
-                {USER.name}.
+                {heroFirstName}
               </h1>
             </motion.div>
 
@@ -407,15 +428,36 @@ export default function Home() {
               initial={{ opacity: 0, scale: 0.7 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: 0.14, type: 'spring', stiffness: 320, damping: 24 }}
-              style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(140deg, #c8902a 0%, #deb040 100%)', color: '#122012', fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 0 2.5px rgba(200,144,42,0.28), 0 4px 20px rgba(200,144,42,0.35)', border: 'none', cursor: 'pointer', flexShrink: 0 }}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: '50%',
+                background: user?.avatarUrl ? 'transparent' : 'linear-gradient(140deg, #c8902a 0%, #deb040 100%)',
+                color: '#122012',
+                fontFamily: 'Fraunces, Georgia, serif',
+                fontSize: 18,
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 0 0 2.5px rgba(200,144,42,0.28), 0 4px 20px rgba(200,144,42,0.35)',
+                border: 'none',
+                cursor: 'pointer',
+                flexShrink: 0,
+                overflow: 'hidden',
+              }}
             >
-              {USER.initials}
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                profileInitials
+              )}
             </motion.button>
           </div>
         </div>
 
         {/* Flex spacer */}
-        <div style={{ flex: 1 }} />
+        <div style={{ flex: 0.4 }} />
 
                 {/* ── LOYALTY CARD — gold physical card style ──────────────────── */}
         <motion.div
@@ -458,8 +500,8 @@ export default function Home() {
 
               {/* Row 2: stamp dots */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6 }}>
-                {Array.from({ length: USER.stampsGoal }).map((_, i) => {
-                  const filled = i < USER.stamps;
+                {Array.from({ length: DEMO_LOYALTY.stampsGoal }).map((_, i) => {
+                  const filled = i < DEMO_LOYALTY.stamps;
                   return (
                     <motion.div
                       key={i}
@@ -477,7 +519,7 @@ export default function Home() {
               {/* Row 3: progress + tap hint */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: 'rgba(26,46,26,0.65)', letterSpacing: '0.01em' }}>
-                  {USER.stampsGoal - USER.stamps} to go until next reward
+                  {DEMO_LOYALTY.stampsGoal - DEMO_LOYALTY.stamps} to go until next reward
                 </p>
                 
               </div>
@@ -485,9 +527,6 @@ export default function Home() {
             </div>
           </motion.div>
         </motion.div>
-
-          {/* Flex spacer */}
-        <div style={{ flex: 1 }} />
 
         {/* BOTTOM SUMMARY: booked events + promo */}
         <div style={{ position: 'relative', padding: '0 18px 22px', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -548,106 +587,138 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ── BRIDGING CTA — straddles hero/cream boundary ───────────────── */}
+      {/* ── BRIDGING CTA or ACTIVE ORDER — straddles hero/cream boundary ── */}
       <div style={{ margin: '-30px 18px 0', position: 'relative', zIndex: 10 }}>
-        <motion.button
-          initial={{ opacity: 0, y: 24, scale: 0.94 }}
-          animate={{
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            boxShadow: [
-              '0 10px 48px rgba(180,120,18,0.44), 0 2px 8px rgba(0,0,0,0.14)',
-              '0 14px 72px rgba(210,150,30,0.78), 0 2px 8px rgba(0,0,0,0.14)',
-              '0 10px 48px rgba(180,120,18,0.44), 0 2px 8px rgba(0,0,0,0.14)',
-            ],
-          }}
-          transition={{
-            opacity: { delay: 0.26, duration: 0.4 },
-            y: { delay: 0.26, type: 'spring', stiffness: 280, damping: 26 },
-            scale: { delay: 0.26, type: 'spring', stiffness: 280, damping: 26 },
-            boxShadow: { duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.5 },
-          }}
-          whileTap={{ scale: 0.97 }}
-          onClick={() => navigate('/order')}
-          style={{ width: '100%', background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', borderRadius: 24, padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', cursor: 'pointer' }}
-        >
-          <div>
-            <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(18,32,18,0.52)', marginBottom: 5 }}>
-              Ready to order?
-            </p>
-            <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 28, fontWeight: 800, color: '#122012', letterSpacing: '-0.025em', lineHeight: 1.0 }}>
-              Start your order
-            </p>
-          </div>
-          <div style={{ position: 'relative', paddingBottom: 18, flexShrink: 0 }}>
-            <span style={{ fontSize: 44, lineHeight: 1, display: 'block' }}>☕</span>
-            <Steam />
-          </div>
-        </motion.button>
+        <AnimatePresence mode="wait">
+          {activeOrder ? (
+            <motion.div
+              key="active-order"
+              initial={{ opacity: 0, y: 24, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.96 }}
+              transition={{
+                opacity: { delay: 0.1, duration: 0.35 },
+                y: { delay: 0.1, type: 'spring', stiffness: 280, damping: 26 },
+                scale: { delay: 0.1, type: 'spring', stiffness: 280, damping: 26 },
+              }}
+              onClick={() => navigate('/profile')}
+              style={{
+                borderRadius: 24,
+                overflow: 'hidden',
+                cursor: 'pointer',
+                boxShadow: '0 10px 40px rgba(180,120,18,0.38), 0 2px 8px rgba(0,0,0,0.12)',
+              }}
+            >
+              {/* ── Gold header ── */}
+              <div style={{ background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', padding: '16px 22px 18px' }}>
+
+                {/* Indeterminate progress bar */}
+                <div style={{ width: '100%', height: 3, background: 'rgba(18,32,18,0.15)', borderRadius: 100, overflow: 'hidden', marginBottom: 14 }}>
+                  <motion.div
+                    style={{ height: '100%', width: '38%', background: 'rgba(18,32,18,0.45)', borderRadius: 100 }}
+                    animate={{ x: ['-100%', '290%'] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                </div>
+
+                {/* Title + pickup chip */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 26, fontWeight: 800, color: '#122012', letterSpacing: '-0.025em', lineHeight: 1.05 }}>
+                    Order being prepared.
+                  </p>
+                  <motion.span
+                    animate={{ opacity: [1, 0.45, 1] }}
+                    transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                    style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, color: '#122012', background: 'rgba(18,32,18,0.16)', borderRadius: 100, padding: '5px 11px', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 4 }}
+                  >
+                    {activeOrder.pickupMinutes === 0 ? 'ASAP' : `~${activeOrder.pickupMinutes} mins`}
+                  </motion.span>
+                </div>
+              </div>
+
+              {/* ── Light content ── */}
+              <div style={{ background: '#faf5eb', padding: '14px 22px 18px' }}>
+
+                {/* Items */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 14 }}>
+                  {activeOrder.items.map((item, i) => {
+                    const DEFAULT_MILKS = ['Full Fat', 'Regular'];
+                    const mods = [item.size !== 'Regular' && item.size, !DEFAULT_MILKS.includes(item.milk) && item.milk].filter(Boolean).join(', ');
+                    return (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                        <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>{item.emoji}</span>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, fontWeight: 600, color: '#1a2e1a' }}>
+                            {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.name}
+                          </span>
+                          {mods && (
+                            <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', display: 'block' }}>{mods}</span>
+                          )}
+                        </div>
+                        {item.totalPrice != null && (
+                          <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, fontWeight: 600, color: '#1a2e1a', flexShrink: 0 }}>
+                            £{((item.totalPrice * item.quantity) / 100).toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Divider + total */}
+                <div style={{ borderTop: '1.5px solid rgba(26,46,26,0.1)', paddingTop: 12, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                  <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>
+                    Total
+                  </span>
+                  <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 22, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>
+                    £{(activeOrder.total / 100).toFixed(2)}
+                  </span>
+                </div>
+
+                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: 'rgba(26,46,26,0.35)', textAlign: 'right', marginTop: 8 }}>
+                  View details ›
+                </p>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="start-order"
+              initial={{ opacity: 0, y: 24, scale: 0.94 }}
+              animate={{
+                opacity: 1, y: 0, scale: 1,
+                boxShadow: [
+                  '0 10px 48px rgba(180,120,18,0.44), 0 2px 8px rgba(0,0,0,0.14)',
+                  '0 14px 72px rgba(210,150,30,0.78), 0 2px 8px rgba(0,0,0,0.14)',
+                  '0 10px 48px rgba(180,120,18,0.44), 0 2px 8px rgba(0,0,0,0.14)',
+                ],
+              }}
+              exit={{ opacity: 0, y: -12, scale: 0.96 }}
+              transition={{
+                opacity: { delay: 0.26, duration: 0.4 },
+                y: { delay: 0.26, type: 'spring', stiffness: 280, damping: 26 },
+                scale: { delay: 0.26, type: 'spring', stiffness: 280, damping: 26 },
+                boxShadow: { duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.5 },
+              }}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => navigate('/order')}
+              style={{ width: '100%', background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', borderRadius: 24, padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', cursor: 'pointer' }}
+            >
+              <div>
+                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(18,32,18,0.52)', marginBottom: 5 }}>
+                  Ready to order?
+                </p>
+                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 28, fontWeight: 800, color: '#122012', letterSpacing: '-0.025em', lineHeight: 1.0 }}>
+                  Start your order
+                </p>
+              </div>
+              <div style={{ position: 'relative', paddingBottom: 18, flexShrink: 0 }}>
+                <span style={{ fontSize: 44, lineHeight: 1, display: 'block' }}>☕</span>
+                <Steam />
+              </div>
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div>
-
-      {/* ── ACTIVE ORDER BANNER ───────────────────────────────────────── */}
-      <AnimatePresence>
-        {activeOrder && (
-          <motion.div
-            initial={{ opacity: 0, y: -8, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -8, scale: 0.97 }}
-            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
-            onClick={() => navigate('/profile')}
-            style={{ margin: '20px 18px 0', cursor: 'pointer' }}
-          >
-            <div style={{
-              background: 'linear-gradient(138deg, #0e1c0e 0%, #1a2e1a 60%, #223828 100%)',
-              borderRadius: 22,
-              padding: '16px 18px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 14,
-              position: 'relative',
-              overflow: 'hidden',
-              boxShadow: '0 6px 28px rgba(0,0,0,0.22), 0 1px 6px rgba(0,0,0,0.1)',
-              border: '1px solid rgba(200,144,42,0.22)',
-            }}>
-              {/* Ambient amber glow */}
-              <motion.div
-                style={{ position: 'absolute', top: -40, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(200,144,42,0.28) 0%, transparent 65%)', pointerEvents: 'none' }}
-                animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
-                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-              />
-
-              {/* Spinner */}
-              <div style={{ flexShrink: 0, position: 'relative' }}>
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                  style={{ width: 40, height: 40 }}
-                >
-                  <svg viewBox="0 0 40 40" fill="none" style={{ width: 40, height: 40 }}>
-                    <circle cx="20" cy="20" r="17" stroke="rgba(200,144,42,0.2)" strokeWidth="3" />
-                    <path d="M20 3 A17 17 0 0 1 37 20" stroke="#c8902a" strokeWidth="3" strokeLinecap="round" />
-                  </svg>
-                </motion.div>
-                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>☕</div>
-              </div>
-
-              {/* Text */}
-              <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#f0e6d0', letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 3 }}>
-                  Order being prepared
-                </p>
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(240,230,208,0.55)', lineHeight: 1.3 }}>
-                  {activeOrder.pickupMinutes === 0 ? 'Ready as soon as possible' : `Pickup in ~${activeOrder.pickupMinutes} mins`}
-                </p>
-              </div>
-
-              {/* Chevron */}
-              <div style={{ flexShrink: 0, color: 'rgba(200,144,42,0.7)', fontSize: 14, position: 'relative' }}>›</div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── SCROLLABLE CONTENT ────────────────────────────────────────── */}
       <div style={{ padding: '40px 18px 60px' }}>
@@ -676,7 +747,7 @@ export default function Home() {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             {events.map((event, i) => (
-              <EventFeatureCard key={event.id} event={event} onToggle={toggleEvent} index={i} />
+              <EventFeatureCard key={event.id} event={event} onToggle={handleEventToggle} index={i} />
             ))}
           </div>
 
@@ -722,7 +793,103 @@ export default function Home() {
 
       {/* ── QR MODAL ──────────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showQR && <QRModal onClose={() => setShowQR(false)} />}
+        {showQR && (
+          <QRModal
+            onClose={() => setShowQR(false)}
+            displayName={displayName}
+            initials={profileInitials}
+            avatarUrl={user?.avatarUrl}
+            stamps={DEMO_LOYALTY.stamps}
+            stampsGoal={DEMO_LOYALTY.stampsGoal}
+            memberSubline={
+              isAuthenticated
+                ? `Demo loyalty · Member since ${DEMO_LOYALTY.memberSince}`
+                : `Sign in to save your card · Demo ${DEMO_LOYALTY.stamps} stamps`
+            }
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showEventSignIn && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 210,
+              background: 'rgba(8,16,8,0.88)',
+              backdropFilter: 'blur(10px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: 24,
+            }}
+            onClick={() => setShowEventSignIn(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.94, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.94, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: '#f0e6d0',
+                borderRadius: 24,
+                padding: 28,
+                maxWidth: 380,
+                width: '100%',
+                boxShadow: '0 12px 48px rgba(0,0,0,0.35)',
+                border: '1.5px solid #d4c0a0',
+              }}
+            >
+              <h3
+                style={{
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: '#1a2e1a',
+                  margin: '0 0 8px',
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                Sign in to join events
+              </h3>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 13,
+                  color: 'rgba(26,46,26,0.55)',
+                  margin: '0 0 20px',
+                  lineHeight: 1.45,
+                }}
+              >
+                Book a spot with your Google account — it only takes a moment.
+              </p>
+              <SignInButton style={{ marginBottom: 16 }} />
+              <button
+                type="button"
+                onClick={() => setShowEventSignIn(false)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(26,46,26,0.06)',
+                  border: '1.5px solid #d4c0a0',
+                  borderRadius: 14,
+                  padding: '12px',
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'rgba(26,46,26,0.55)',
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </motion.div>
   );

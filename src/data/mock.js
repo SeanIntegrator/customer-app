@@ -1,6 +1,5 @@
-export const USER = {
-  name: 'Cristina',
-  initials: 'C',
+/** Mock loyalty stats until backend loyalty APIs exist. */
+export const DEMO_LOYALTY = {
   memberSince: 'January 2024',
   stamps: 6,
   stampsGoal: 9,
@@ -30,7 +29,7 @@ export const EVENTS = [
     spotsLeft: 8,
     totalSpots: 20,
     emoji: '🍷',
-    registered: true,
+    registered: false,
     category: 'social',
   },
   {

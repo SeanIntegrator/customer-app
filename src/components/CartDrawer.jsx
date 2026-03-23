@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import { submitOrder } from '../lib/api';
-import { USER } from '../data/mock';
 import OrderSuccess from './OrderSuccess';
+import SignInButton from './SignInButton';
 
 const MIN_PICKUP = 0;
 const STEP = 5;
@@ -35,11 +36,17 @@ const stepperBtn = {
 export default function CartDrawer({ open, onClose }) {
   const navigate = useNavigate();
   const { items, updateQuantity, clearCart, subtotal, setActiveOrder } = useCart();
+  const { user, isAuthenticated, authFetch } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [pickupMinutes, setPickupMinutes] = useState(10);
   const [orderNote, setOrderNote] = useState('');
+  const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated) setShowCheckoutSignIn(false);
+  }, [isAuthenticated]);
 
   const adjustPickup = (delta) => {
     setPickupMinutes((m) => Math.max(MIN_PICKUP, m + delta));
@@ -47,6 +54,10 @@ export default function CartDrawer({ open, onClose }) {
 
   const handlePlaceOrder = async () => {
     if (items.length === 0 || submitting) return;
+    if (!isAuthenticated) {
+      setShowCheckoutSignIn(true);
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -75,19 +86,22 @@ export default function CartDrawer({ open, onClose }) {
       : autoNote;
 
     const orderSnapshot = {
-      items: items.map((i) => ({ name: i.name, emoji: i.emoji, quantity: i.quantity, size: i.size, milk: i.milk, category: i.category })),
+      items: items.map((i) => ({ name: i.name, emoji: i.emoji, quantity: i.quantity, size: i.size, milk: i.milk, category: i.category, totalPrice: i.totalPrice })),
       pickupMinutes,
       total: subtotal,
       placedAt: Date.now(),
     };
 
     try {
-      const data = await submitOrder({
-        lineItems,
-        customerName: USER.name,
-        note: fullNote,
-        pickupMinutes,
-      });
+      const data = await submitOrder(
+        {
+          lineItems,
+          customerName: user.displayName,
+          note: fullNote,
+          pickupMinutes,
+        },
+        authFetch
+      );
       setActiveOrder({ ...orderSnapshot, orderId: data.order_id });
       clearCart();
       setOrderSuccess(true);
@@ -99,6 +113,7 @@ export default function CartDrawer({ open, onClose }) {
   };
 
   const handleSuccessDone = () => {
+    onClose();
     setOrderNote('');
     setPickupMinutes(10);
     navigate('/');
@@ -121,7 +136,7 @@ export default function CartDrawer({ open, onClose }) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 38 }}
-            className="fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col max-h-[90vh]"
+            className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : 'max-h-[90vh]'}`}
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
           >
             {orderSuccess ? (
@@ -289,6 +304,50 @@ export default function CartDrawer({ open, onClose }) {
                       gap: 12,
                     }}
                   >
+                    {showCheckoutSignIn && (
+                      <div
+                        style={{
+                          textAlign: 'center',
+                          background: 'rgba(26,46,26,0.06)',
+                          borderRadius: 16,
+                          padding: '14px 16px',
+                          border: '1.5px solid #d4c0a0',
+                        }}
+                      >
+                        <p
+                          style={{
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: '#1a2e1a',
+                            margin: '0 0 10px',
+                          }}
+                        >
+                          Sign in to place your order
+                        </p>
+                        <SignInButton
+                          style={{ display: 'flex', justifyContent: 'center' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCheckoutSignIn(false)}
+                          style={{
+                            marginTop: 10,
+                            background: 'none',
+                            border: 'none',
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: 'rgba(26,46,26,0.45)',
+                            cursor: 'pointer',
+                            width: '100%',
+                          }}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    )}
+
                     {error && (
                       <p style={{
                         fontFamily: 'Plus Jakarta Sans, sans-serif',
