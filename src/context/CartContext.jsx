@@ -21,11 +21,15 @@ export function CartProvider({ children }) {
       if (existing) {
         return prev.map((i) =>
           `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}` === key
-            ? { ...i, quantity: i.quantity + (item.quantity ?? 1) }
+            ? {
+                ...i,
+                quantity: i.quantity + (item.quantity ?? 1),
+                fromExistingOrder: Boolean(i.fromExistingOrder || item.fromExistingOrder),
+              }
             : i
         );
       }
-      return [...prev, { ...item, quantity: item.quantity ?? 1 }];
+      return [...prev, { ...item, quantity: item.quantity ?? 1, fromExistingOrder: item.fromExistingOrder ?? false }];
     });
   }, []);
 
@@ -60,6 +64,7 @@ export function CartProvider({ children }) {
         alterations: apiModifiersToAlterationNames(it.modifiers),
         quantity: it.quantity,
         totalPrice: it.unit_price,
+        fromExistingOrder: true,
       }))
     );
   }, []);

@@ -2,7 +2,16 @@ import { motion } from 'framer-motion';
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
-export default function OrderSuccess({ onDone, pickupMinutes = 15 }) {
+/**
+ * @param {'placed' | 'updated'} [variant]
+ */
+export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'placed' }) {
+  const updated = variant === 'updated';
+  const title = updated ? 'Order successfully updated' : 'Order placed!';
+  const subline = updated
+    ? 'Your baristas have your latest order.'
+    : 'Your order is with the baristas.';
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -73,14 +82,15 @@ export default function OrderSuccess({ onDone, pickupMinutes = 15 }) {
       >
         <h2 style={{
           fontFamily: 'Fraunces, Georgia, serif',
-          fontSize: 36,
+          fontSize: updated ? 28 : 36,
           fontWeight: 900,
           color: '#f0e6d0',
           letterSpacing: '-0.03em',
           marginBottom: 8,
           margin: '0 0 8px',
+          lineHeight: 1.15,
         }}>
-          Order placed!
+          {title}
         </h2>
         <p style={{
           fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -90,7 +100,7 @@ export default function OrderSuccess({ onDone, pickupMinutes = 15 }) {
           margin: '0 0 4px',
           lineHeight: 1.5,
         }}>
-          Your order is with the baristas.
+          {subline}
         </p>
         <p style={{
           fontFamily: 'Plus Jakarta Sans, sans-serif',

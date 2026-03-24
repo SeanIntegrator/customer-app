@@ -49,6 +49,7 @@ export default function CartDrawer({ open, onClose }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderSuccessVariant, setOrderSuccessVariant] = useState('placed');
   const [pickupMinutes, setPickupMinutes] = useState(10);
   const [orderNote, setOrderNote] = useState('');
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
@@ -56,6 +57,13 @@ export default function CartDrawer({ open, onClose }) {
   useEffect(() => {
     if (isAuthenticated) setShowCheckoutSignIn(false);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!open) {
+      setOrderSuccess(false);
+      setOrderSuccessVariant('placed');
+    }
+  }, [open]);
 
   const adjustPickup = (delta) => {
     setPickupMinutes((m) => Math.max(MIN_PICKUP, m + delta));
@@ -97,6 +105,7 @@ export default function CartDrawer({ open, onClose }) {
 
     try {
       if (editOrderId != null) {
+        setOrderSuccessVariant('updated');
         const updated = await updateCustomerOrder(authFetch, editOrderId, {
           customer_name: user.displayName,
           note: fullNote,
@@ -111,6 +120,7 @@ export default function CartDrawer({ open, onClose }) {
         });
         clearEditMode();
       } else {
+        setOrderSuccessVariant('placed');
         const data = await submitOrder(
           {
             cartItems: items,
@@ -164,7 +174,11 @@ export default function CartDrawer({ open, onClose }) {
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
           >
             {orderSuccess ? (
-              <OrderSuccess onDone={handleSuccessDone} pickupMinutes={pickupMinutes} />
+              <OrderSuccess
+                variant={orderSuccessVariant}
+                onDone={handleSuccessDone}
+                pickupMinutes={pickupMinutes}
+              />
             ) : (
               <>
                 {/* Dark green combined header */}
@@ -240,7 +254,6 @@ export default function CartDrawer({ open, onClose }) {
                       {items.map((item) => (
                         <motion.div
                           key={item.cartId}
-                          layout
                           initial={{ opacity: 0, y: 8 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, x: -20 }}

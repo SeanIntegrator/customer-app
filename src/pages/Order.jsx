@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 import useCatalog from '../hooks/useCatalog';
+import { fetchCustomerOrders } from '../lib/api';
 import MenuItem from '../components/MenuItem';
 import ItemDetailSheet from '../components/ItemDetailSheet';
 import CartDrawer from '../components/CartDrawer';
@@ -11,12 +13,65 @@ const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 
 export default function Order() {
   const location = useLocation();
+  const { user, loading: authLoading, authFetch } = useAuth();
   const { items: catalogItems, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error } = useCatalog();
-  const { addItem, totalItems, subtotal, editOrderId } = useCart();
+  const { addItem, totalItems, subtotal, editOrderId, loadCartFromOrderEdit, items: cartItems } = useCart();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [cartBounce, setCartBounce] = useState(false);
+  const [serverActiveOrderResolved, setServerActiveOrderResolved] = useState(false);
+
+  const hasAuthToken =
+    typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('auth_token');
+
+  const qtyByCatalogId = useMemo(() => {
+    const m = new Map();
+    for (const line of cartItems) {
+      const cid = line.catalogObjectId;
+      if (!cid) continue;
+      const fromOrder =
+        editOrderId != null &&
+        (line.fromExistingOrder === true || String(line.cartId || '').startsWith('edit-'));
+      const cur = m.get(cid) || { basket: 0, ordered: 0 };
+      if (fromOrder) cur.ordered += line.quantity;
+      else cur.basket += line.quantity;
+      m.set(cid, cur);
+    }
+    return m;
+  }, [cartItems, editOrderId]);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      setServerActiveOrderResolved(true);
+      return;
+    }
+    if (editOrderId != null) {
+      setServerActiveOrderResolved(true);
+      return;
+    }
+    setServerActiveOrderResolved(false);
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await fetchCustomerOrders(authFetch, { status: 'pending,confirmed' });
+        if (!cancelled && list[0]) {
+          loadCartFromOrderEdit(list[0]);
+        }
+      } catch {
+        /* ignore */
+      } finally {
+        if (!cancelled) setServerActiveOrderResolved(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, editOrderId, authFetch, loadCartFromOrderEdit]);
+
+  const addToMenuBlocked =
+    (authLoading && hasAuthToken) || (!!user && !serverActiveOrderResolved);
 
   useEffect(() => {
     if (location.state?.openCart) {
@@ -24,12 +79,6 @@ export default function Order() {
       window.history.replaceState({}, '');
     }
   }, [location.state?.openCart]);
-
-  useEffect(() => {
-    if (editOrderId != null && totalItems > 0) {
-      setCartOpen(true);
-    }
-  }, [editOrderId, totalItems]);
 
   const filtered =
     activeCategory === 'all'
@@ -46,6 +95,8 @@ export default function Order() {
     setCartBounce(true);
     setTimeout(() => setCartBounce(false), 400);
   };
+
+  const showInProgressBanner = editOrderId != null;
 
   return (
     <motion.div
@@ -111,6 +162,56 @@ export default function Order() {
           Pickup in ~10 minutes
         </p>
       </div>
+
+      {showInProgressBanner && (
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 20,
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            padding: '12px 20px',
+            background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+            borderBottom: '1px solid rgba(18,32,18,0.12)',
+            boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          }}
+        >
+          <p
+            style={{
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+              fontSize: 13,
+              fontWeight: 600,
+              color: '#122012',
+              margin: 0,
+              lineHeight: 1.35,
+            }}
+          >
+            You have an order in progress — add items or save changes from your cart.
+          </p>
+          <button
+            type="button"
+            onClick={() => setCartOpen(true)}
+            style={{
+              flexShrink: 0,
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#f0e6d0',
+              background: '#1a2e1a',
+              border: 'none',
+              borderRadius: 100,
+              padding: '8px 14px',
+              cursor: 'pointer',
+            }}
+          >
+            View cart
+          </button>
+        </div>
+      )}
 
       {/* Category tabs */}
       <div
@@ -202,7 +303,14 @@ export default function Order() {
                   exit={{ opacity: 0, scale: 0.92 }}
                   transition={{ delay: i * 0.03, type: 'spring', stiffness: 400, damping: 30 }}
                 >
-                  <MenuItem item={item} onTap={setSelectedItem} />
+                  <MenuItem
+                    item={item}
+                    onTap={setSelectedItem}
+                    disabled={addToMenuBlocked}
+                    basketQty={qtyByCatalogId.get(item.catalogObjectId)?.basket ?? 0}
+                    orderedQty={qtyByCatalogId.get(item.catalogObjectId)?.ordered ?? 0}
+                    orderEditMode={editOrderId != null}
+                  />
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -218,7 +326,7 @@ export default function Order() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 80, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-            style={{ position: 'absolute', bottom: 4, left: 18, right: 18, zIndex: 30 }}
+            style={{ position: 'absolute', bottom: 12, left: 18, right: 18, zIndex: 30 }}
           >
             <motion.button
               animate={cartBounce ? { scale: [1, 1.05, 0.98, 1] } : { scale: 1 }}
@@ -278,6 +386,7 @@ export default function Order() {
         sizeOptions={sizeOptions}
         syrupOptions={syrupOptions}
         alterationOptions={alterationOptions}
+        addDisabled={addToMenuBlocked}
       />
 
       {/* Cart drawer */}

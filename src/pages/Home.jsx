@@ -319,25 +319,33 @@ const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'
 export default function Home() {
   const navigate = useNavigate();
   const { activeOrder, loadCartFromOrderEdit } = useCart();
-  const { user, isAuthenticated, authFetch } = useAuth();
+  const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showEventSignIn, setShowEventSignIn] = useState(false);
   const [serverLiveOrder, setServerLiveOrder] = useState(null);
+  const [ordersLoading, setOrdersLoading] = useState(false);
   const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
+
+  const hasAuthToken =
+    typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('auth_token');
 
   const refreshLiveOrder = useCallback(async () => {
     if (!isAuthenticated) {
       setServerLiveOrder(null);
+      setOrdersLoading(false);
       return;
     }
+    setOrdersLoading(true);
     try {
       const list = await fetchCustomerOrders(authFetch, { status: 'pending,confirmed' });
       setServerLiveOrder(list[0] ?? null);
     } catch {
       setServerLiveOrder(null);
+    } finally {
+      setOrdersLoading(false);
     }
   }, [isAuthenticated, authFetch]);
 
@@ -376,6 +384,10 @@ export default function Home() {
     }
     return null;
   })();
+
+  const bridgingCtaLoading =
+    (isAuthenticated && (authLoading || ordersLoading) && !goldCardModel) ||
+    (authLoading && hasAuthToken && !goldCardModel);
 
   const displayName = user?.displayName ?? 'Guest';
   const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : "Welcome.";
@@ -649,7 +661,56 @@ export default function Home() {
       {/* ── BRIDGING CTA or ACTIVE ORDER — straddles hero/cream boundary ── */}
       <div style={{ margin: '-42px 18px 0', position: 'relative', zIndex: 10 }}>
         <AnimatePresence mode="wait">
-          {goldCardModel ? (
+          {bridgingCtaLoading ? (
+            <motion.div
+              key="order-skeleton"
+              initial={{ opacity: 0, y: 24, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -12, scale: 0.96 }}
+              transition={{ duration: 0.3 }}
+              style={{
+                borderRadius: 24,
+                overflow: 'hidden',
+                boxShadow: '0 10px 40px rgba(180,120,18,0.22), 0 2px 8px rgba(0,0,0,0.08)',
+              }}
+            >
+              <div
+                style={{
+                  background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                  padding: '16px 22px 18px',
+                }}
+              >
+                <div
+                  style={{
+                    width: '55%',
+                    height: 10,
+                    borderRadius: 100,
+                    background: 'rgba(18,32,18,0.12)',
+                    marginBottom: 14,
+                  }}
+                />
+                <div
+                  style={{
+                    width: '72%',
+                    height: 22,
+                    borderRadius: 8,
+                    background: 'rgba(18,32,18,0.14)',
+                  }}
+                />
+              </div>
+              <div style={{ background: '#faf5eb', padding: '18px 22px 22px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                  {[1, 2].map((k) => (
+                    <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(26,46,26,0.08)' }} />
+                      <div style={{ flex: 1, height: 14, borderRadius: 6, background: 'rgba(26,46,26,0.07)' }} />
+                    </div>
+                  ))}
+                </div>
+                <div style={{ height: 12, width: '40%', borderRadius: 6, background: 'rgba(26,46,26,0.06)', marginLeft: 'auto' }} />
+              </div>
+            </motion.div>
+          ) : goldCardModel ? (
             <motion.div
               key="active-order"
               initial={{ opacity: 0, y: 24, scale: 0.94 }}

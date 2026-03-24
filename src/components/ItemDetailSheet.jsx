@@ -4,7 +4,16 @@ import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS, getSyrupChipColors } from '.
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
-export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOptions = MILK_OPTIONS, sizeOptions = SIZE_OPTIONS, syrupOptions = SYRUP_OPTIONS, alterationOptions = [] }) {
+export default function ItemDetailSheet({
+  item,
+  onClose,
+  onAddToCart,
+  milkOptions = MILK_OPTIONS,
+  sizeOptions = SIZE_OPTIONS,
+  syrupOptions = SYRUP_OPTIONS,
+  alterationOptions = [],
+  addDisabled = false,
+}) {
   const [size, setSize] = useState('Regular');
   const [milk, setMilk] = useState('Full Fat');
   const [syrup, setSyrup] = useState(null);
@@ -33,7 +42,7 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
   const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
-    if (!item) return;
+    if (!item || addDisabled) return;
     const cartId = `${item.catalogObjectId}|${size}|${milk}|${syrup ?? 'none'}|${alterations.join(',')}|${Date.now()}`;
     onAddToCart({
       cartId,
@@ -365,26 +374,40 @@ export default function ItemDetailSheet({ item, onClose, onAddToCart, milkOption
                 </div>
               </div>
 
+              {addDisabled && (
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 13,
+                    color: 'rgba(26,46,26,0.55)',
+                    textAlign: 'center',
+                    marginBottom: 12,
+                  }}
+                >
+                  One moment — loading your order…
+                </p>
+              )}
               {/* Add to order */}
               <motion.button
-                whileTap={{ scale: 0.97 }}
+                whileTap={addDisabled ? {} : { scale: 0.97 }}
                 onClick={handleAdd}
+                disabled={addDisabled}
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
-                  color: '#122012',
+                  background: addDisabled ? 'rgba(26,46,26,0.12)' : 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                  color: addDisabled ? 'rgba(26,46,26,0.35)' : '#122012',
                   borderRadius: 22,
                   padding: '18px 24px',
                   border: 'none',
-                  cursor: 'pointer',
+                  cursor: addDisabled ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  boxShadow: '0 4px 20px rgba(200,144,42,0.35)',
+                  boxShadow: addDisabled ? 'none' : '0 4px 20px rgba(200,144,42,0.35)',
                 }}
               >
                 <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  Add to order
+                  {addDisabled ? 'Please wait…' : 'Add to order'}
                 </span>
                 <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
                   £{(totalPrice / 100).toFixed(2)}
