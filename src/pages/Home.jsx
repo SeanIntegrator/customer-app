@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEMO_LOYALTY, EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
@@ -6,6 +6,13 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { initialsFromName } from '../lib/userDisplay';
 import SignInButton from '../components/SignInButton';
+import EditOrderModal from '../components/EditOrderModal';
+import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
+
+function minutesFromPickupIso(iso) {
+  if (!iso) return 10;
+  return Math.max(0, Math.round((new Date(iso) - Date.now()) / 60000));
+}
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -311,12 +318,64 @@ const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'
 
 export default function Home() {
   const navigate = useNavigate();
-  const { activeOrder } = useCart();
-  const { user, isAuthenticated } = useAuth();
+  const { activeOrder, loadCartFromOrderEdit } = useCart();
+  const { user, isAuthenticated, authFetch } = useAuth();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [showEventSignIn, setShowEventSignIn] = useState(false);
+  const [serverLiveOrder, setServerLiveOrder] = useState(null);
+  const [editOrderOpen, setEditOrderOpen] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState(null);
+
+  const refreshLiveOrder = useCallback(async () => {
+    if (!isAuthenticated) {
+      setServerLiveOrder(null);
+      return;
+    }
+    try {
+      const list = await fetchCustomerOrders(authFetch, { status: 'pending,confirmed' });
+      setServerLiveOrder(list[0] ?? null);
+    } catch {
+      setServerLiveOrder(null);
+    }
+  }, [isAuthenticated, authFetch]);
+
+  useEffect(() => {
+    refreshLiveOrder();
+  }, [refreshLiveOrder, activeOrder?.placedAt, activeOrder?.orderId]);
+
+  const goldCardModel = (() => {
+    if (serverLiveOrder) {
+      return {
+        id: serverLiveOrder.id,
+        status: serverLiveOrder.status,
+        total_amount: serverLiveOrder.total_amount,
+        pickupMinutes: minutesFromPickupIso(serverLiveOrder.pickup_time),
+        items: (serverLiveOrder.items || []).map((it) => ({
+          name: it.item_name,
+          emoji: it.item_emoji || '☕',
+          quantity: it.quantity,
+          totalPrice: it.unit_price,
+          size: 'Regular',
+          milk: 'Full Fat',
+        })),
+        editable: serverLiveOrder.status === 'pending' || serverLiveOrder.status === 'confirmed',
+      };
+    }
+    if (activeOrder && (activeOrder.orderId != null || activeOrder.dbOrderId != null)) {
+      const id = activeOrder.dbOrderId ?? activeOrder.orderId;
+      return {
+        id,
+        status: 'confirmed',
+        total_amount: activeOrder.total,
+        pickupMinutes: activeOrder.pickupMinutes ?? 10,
+        items: activeOrder.items || [],
+        editable: true,
+      };
+    }
+    return null;
+  })();
 
   const displayName = user?.displayName ?? 'Guest';
   const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : "Welcome.";
@@ -590,7 +649,7 @@ export default function Home() {
       {/* ── BRIDGING CTA or ACTIVE ORDER — straddles hero/cream boundary ── */}
       <div style={{ margin: '-42px 18px 0', position: 'relative', zIndex: 10 }}>
         <AnimatePresence mode="wait">
-          {activeOrder ? (
+          {goldCardModel ? (
             <motion.div
               key="active-order"
               initial={{ opacity: 0, y: 24, scale: 0.94 }}
@@ -601,7 +660,14 @@ export default function Home() {
                 y: { delay: 0.1, type: 'spring', stiffness: 280, damping: 26 },
                 scale: { delay: 0.1, type: 'spring', stiffness: 280, damping: 26 },
               }}
-              onClick={() => navigate('/profile')}
+              onClick={() => {
+                if (goldCardModel.editable && goldCardModel.id != null) {
+                  setEditingOrderId(goldCardModel.id);
+                  setEditOrderOpen(true);
+                } else {
+                  navigate('/profile');
+                }
+              }}
               style={{
                 borderRadius: 24,
                 overflow: 'hidden',
@@ -631,7 +697,7 @@ export default function Home() {
                     transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                     style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, color: '#122012', background: 'rgba(18,32,18,0.16)', borderRadius: 100, padding: '5px 11px', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 4 }}
                   >
-                    {activeOrder.pickupMinutes === 0 ? 'ASAP' : `~${activeOrder.pickupMinutes} mins`}
+                    {goldCardModel.pickupMinutes === 0 ? 'ASAP' : `~${goldCardModel.pickupMinutes} mins`}
                   </motion.span>
                 </div>
               </div>
@@ -641,7 +707,7 @@ export default function Home() {
 
                 {/* Items */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 14 }}>
-                  {activeOrder.items.map((item, i) => {
+                  {goldCardModel.items.map((item, i) => {
                     const DEFAULT_MILKS = ['Full Fat', 'Regular'];
                     const mods = [item.size !== 'Regular' && item.size, !DEFAULT_MILKS.includes(item.milk) && item.milk].filter(Boolean).join(', ');
                     return (
@@ -671,12 +737,12 @@ export default function Home() {
                     Total
                   </span>
                   <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 22, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>
-                    £{(activeOrder.total / 100).toFixed(2)}
+                    £{(goldCardModel.total_amount / 100).toFixed(2)}
                   </span>
                 </div>
 
                 <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: 'rgba(26,46,26,0.35)', textAlign: 'right', marginTop: 8 }}>
-                  View details ›
+                  {goldCardModel.editable ? 'Tap to edit order ›' : 'View details ›'}
                 </p>
               </div>
             </motion.div>
@@ -891,6 +957,29 @@ export default function Home() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <EditOrderModal
+        orderId={editingOrderId}
+        open={editOrderOpen}
+        onClose={() => {
+          setEditOrderOpen(false);
+          setEditingOrderId(null);
+        }}
+        authFetch={authFetch}
+        onSaved={refreshLiveOrder}
+        onAddMoreItems={async () => {
+          if (editingOrderId == null) return;
+          try {
+            const o = await fetchCustomerOrder(authFetch, editingOrderId);
+            loadCartFromOrderEdit(o);
+            setEditOrderOpen(false);
+            setEditingOrderId(null);
+            navigate('/order');
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      />
     </motion.div>
   );
 }

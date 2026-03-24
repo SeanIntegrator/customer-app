@@ -12,7 +12,7 @@ const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg
 export default function Order() {
   const location = useLocation();
   const { items: catalogItems, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error } = useCatalog();
-  const { addItem, totalItems, subtotal } = useCart();
+  const { addItem, totalItems, subtotal, editOrderId } = useCart();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -24,6 +24,12 @@ export default function Order() {
       window.history.replaceState({}, '');
     }
   }, [location.state?.openCart]);
+
+  useEffect(() => {
+    if (editOrderId != null && totalItems > 0) {
+      setCartOpen(true);
+    }
+  }, [editOrderId, totalItems]);
 
   const filtered =
     activeCategory === 'all'
@@ -251,7 +257,9 @@ export default function Order() {
                 }}>
                   {totalItems}
                 </span>
-                <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>View order</span>
+                <span style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  {editOrderId != null ? 'Update order' : 'View order'}
+                </span>
               </div>
               <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
                 £{(subtotal / 100).toFixed(2)}

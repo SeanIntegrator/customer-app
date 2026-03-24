@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { submitOrder } from '../lib/api';
+import { submitOrder, orderLineItemsFromCartItems, updateCustomerOrder } from '../lib/api';
 import OrderSuccess from './OrderSuccess';
 import SignInButton from './SignInButton';
 
 const MIN_PICKUP = 0;
 const STEP = 5;
+const DEFAULT_MILKS = ['Full Fat', 'Regular'];
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
@@ -35,7 +36,15 @@ const stepperBtn = {
 
 export default function CartDrawer({ open, onClose }) {
   const navigate = useNavigate();
-  const { items, updateQuantity, clearCart, subtotal, setActiveOrder } = useCart();
+  const {
+    items,
+    updateQuantity,
+    clearCart,
+    subtotal,
+    setActiveOrder,
+    editOrderId,
+    clearEditMode,
+  } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -61,12 +70,6 @@ export default function CartDrawer({ open, onClose }) {
     setSubmitting(true);
     setError(null);
 
-    const lineItems = items.map((item) => ({
-      catalog_object_id: item.catalogObjectId,
-      quantity: String(item.quantity),
-    }));
-
-    const DEFAULT_MILKS = ['Full Fat', 'Regular'];
     const autoNote = items
       .map((item) => {
         const mods = [
@@ -93,16 +96,37 @@ export default function CartDrawer({ open, onClose }) {
     };
 
     try {
-      const data = await submitOrder(
-        {
-          lineItems,
-          customerName: user.displayName,
+      if (editOrderId != null) {
+        const updated = await updateCustomerOrder(authFetch, editOrderId, {
+          customer_name: user.displayName,
           note: fullNote,
-          pickupMinutes,
-        },
-        authFetch
-      );
-      setActiveOrder({ ...orderSnapshot, orderId: data.order_id });
+          pickup_minutes: pickupMinutes,
+          line_items: orderLineItemsFromCartItems(items),
+        });
+        setActiveOrder({
+          ...orderSnapshot,
+          orderId: updated.id,
+          dbOrderId: updated.id,
+          squareOrderId: updated.square_order_id,
+        });
+        clearEditMode();
+      } else {
+        const data = await submitOrder(
+          {
+            cartItems: items,
+            customerName: user.displayName,
+            note: fullNote,
+            pickupMinutes,
+          },
+          authFetch
+        );
+        setActiveOrder({
+          ...orderSnapshot,
+          orderId: data.db_order_id ?? data.order_id,
+          dbOrderId: data.db_order_id,
+          squareOrderId: data.order_id,
+        });
+      }
       clearCart();
       setOrderSuccess(true);
     } catch (err) {
@@ -180,7 +204,7 @@ export default function CartDrawer({ open, onClose }) {
                       margin: 0,
                       letterSpacing: '-0.02em',
                     }}>
-                      Your order
+                      {editOrderId != null ? 'Update order' : 'Your order'}
                     </h2>
                     <button
                       onClick={onClose}
@@ -492,7 +516,7 @@ export default function CartDrawer({ open, onClose }) {
                         </>
                       ) : (
                         <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                          Place order
+                          {editOrderId != null ? 'Save changes' : 'Place order'}
                         </span>
                       )}
                     </motion.button>
