@@ -12,7 +12,8 @@ export default function GoogleOneTap() {
     disabled: !CLIENT_ID || isAuthenticated,
     cancel_on_tap_outside: true,
     context: 'signin',
-    auto_select: true,
+    auto_select: false,
+    use_fedcm_for_prompt: false,
   });
 
   return null;

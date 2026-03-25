@@ -82,12 +82,12 @@ export default function MenuItem({
                   color: '#f0e6d0',
                   background: '#1a2e1a',
                   borderRadius: 100,
-                  padding: '3px 8px',
+                  padding: '4px 8px',
                   lineHeight: 1.2,
                   boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
                 }}
               >
-                {orderedQty} in order
+                {orderedQty}
               </span>
             )}
             {hasBasket && (

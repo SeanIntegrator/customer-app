@@ -3,41 +3,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetchCustomerOrder, updateCustomerOrder } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import OrderSuccess from './OrderSuccess';
+import {
+  PAPER_GRAIN_BACKGROUND,
+  PICKUP_STEP,
+  adjustPickupStepper,
+  checkoutStepperButtonStyle,
+  formatPickupTimeShort,
+  pickupIsoToStepperMinutes,
+} from '../lib/pickup';
 
-const PICKUP_STEP = 5;
-/** Minutes from now; below this we treat as ASAP (0 sent to API). */
-const PICKUP_MIN_SCHEDULED = 10;
-const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
-
-/** Map order pickup_time to minutes-from-now for the stepper (0 = ASAP, else multiples of 5, min 10). */
-function minutesFromOrderPickup(iso) {
-  if (!iso) return PICKUP_MIN_SCHEDULED;
-  const rem = Math.round((new Date(iso) - Date.now()) / 60000);
-  if (rem < PICKUP_MIN_SCHEDULED) return 0;
-  const snapped = Math.round(rem / PICKUP_STEP) * PICKUP_STEP;
-  return Math.max(PICKUP_MIN_SCHEDULED, snapped);
-}
-
-function formatPickupLabel(minutes) {
-  if (minutes === 0) return 'ASAP';
-  const d = new Date(Date.now() + minutes * 60 * 1000);
-  return d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
-}
-
-const stepperBtn = {
-  width: 28,
-  height: 28,
-  borderRadius: '48%',
-  background: 'rgba(26,46,26,0.08)',
-  border: '1.5px solid #d4c0a0',
-  color: '#1a2e1a',
-  fontSize: 16,
-  fontWeight: 700,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-};
+const stepperBtn = checkoutStepperButtonStyle;
 
 export default function EditOrderModal({
   orderId,
@@ -89,7 +64,7 @@ export default function EditOrderModal({
         const o = await fetchCustomerOrder(authFetch, orderId);
         if (cancelled) return;
         setNote(o.notes || '');
-        setPickupMinutes(minutesFromOrderPickup(o.pickup_time));
+        setPickupMinutes(pickupIsoToStepperMinutes(o.pickup_time));
         setStatus(o.status || '');
         setLines(
           (o.items || []).map((it, idx) => ({
@@ -116,14 +91,7 @@ export default function EditOrderModal({
   const editable = status === 'pending' || status === 'confirmed';
 
   const adjustPickup = (delta) => {
-    setPickupMinutes((m) => {
-      if (delta > 0) {
-        if (m === 0) return PICKUP_MIN_SCHEDULED;
-        return m + PICKUP_STEP;
-      }
-      if (m <= PICKUP_MIN_SCHEDULED) return 0;
-      return m - PICKUP_STEP;
-    });
+    setPickupMinutes((m) => adjustPickupStepper(m, delta));
   };
 
   const bumpQty = (key, delta) => {
@@ -238,7 +206,7 @@ export default function EditOrderModal({
                     style={{
                       position: 'absolute',
                       inset: 0,
-                      backgroundImage: GRAIN,
+                      backgroundImage: PAPER_GRAIN_BACKGROUND,
                       backgroundRepeat: 'repeat',
                       pointerEvents: 'none',
                     }}
@@ -465,13 +433,13 @@ export default function EditOrderModal({
                                 margin: '4px 0 0',
                               }}
                             >
-                              {pickupMinutes === 0 ? 'ASAP' : formatPickupLabel(pickupMinutes)}
+                              {pickupMinutes === 0 ? 'ASAP' : formatPickupTimeShort(pickupMinutes)}
                             </p>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             <button
                               type="button"
-                              onClick={() => adjustPickup(-1)}
+                              onClick={() => adjustPickup(-PICKUP_STEP)}
                               disabled={pickupMinutes === 0}
                               style={{ ...stepperBtn, opacity: pickupMinutes === 0 ? 0.35 : 1 }}
                             >
@@ -488,7 +456,7 @@ export default function EditOrderModal({
                             >
                               {pickupMinutes === 0 ? 'ASAP' : `${pickupMinutes}m`}
                             </span>
-                            <button type="button" onClick={() => adjustPickup(1)} style={stepperBtn}>
+                            <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>
                               +
                             </button>
                           </div>

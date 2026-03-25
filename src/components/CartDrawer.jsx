@@ -6,33 +6,19 @@ import { useAuth } from '../context/AuthContext';
 import { submitOrder, orderLineItemsFromCartItems, updateCustomerOrder } from '../lib/api';
 import OrderSuccess from './OrderSuccess';
 import SignInButton from './SignInButton';
+import {
+  PAPER_GRAIN_BACKGROUND,
+  PICKUP_MIN_PICKUP,
+  PICKUP_STEP,
+  DEFAULT_PICKUP_MINUTES,
+  adjustPickupStepper,
+  checkoutStepperButtonStyle,
+  formatPickupTimeWithAtPrefix,
+} from '../lib/pickup';
 
-const MIN_PICKUP = 0;
-const STEP = 5;
 const DEFAULT_MILKS = ['Full Fat', 'Regular'];
 
-const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
-
-function formatPickupTime(minutes) {
-  if (minutes === 0) return 'ASAP';
-  const d = new Date(Date.now() + minutes * 60 * 1000);
-  return `at ${d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
-}
-
-const stepperBtn = {
-  width: 28,
-  height: 28,
-  borderRadius: '48%',
-  background: 'rgba(26,46,26,0.08)',
-  border: '1.5px solid #d4c0a0',
-  color: '#1a2e1a',
-  fontSize: 16,
-  fontWeight: 700,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  cursor: 'pointer',
-};
+const stepperBtn = checkoutStepperButtonStyle;
 
 export default function CartDrawer({ open, onClose }) {
   const navigate = useNavigate();
@@ -50,7 +36,7 @@ export default function CartDrawer({ open, onClose }) {
   const [error, setError] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderSuccessVariant, setOrderSuccessVariant] = useState('placed');
-  const [pickupMinutes, setPickupMinutes] = useState(10);
+  const [pickupMinutes, setPickupMinutes] = useState(DEFAULT_PICKUP_MINUTES);
   const [orderNote, setOrderNote] = useState('');
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
 
@@ -66,7 +52,7 @@ export default function CartDrawer({ open, onClose }) {
   }, [open]);
 
   const adjustPickup = (delta) => {
-    setPickupMinutes((m) => Math.max(MIN_PICKUP, m + delta));
+    setPickupMinutes((m) => adjustPickupStepper(m, delta));
   };
 
   const handlePlaceOrder = async () => {
@@ -149,7 +135,7 @@ export default function CartDrawer({ open, onClose }) {
   const handleSuccessDone = () => {
     onClose();
     setOrderNote('');
-    setPickupMinutes(10);
+    setPickupMinutes(DEFAULT_PICKUP_MINUTES);
     navigate('/');
   };
 
@@ -194,7 +180,7 @@ export default function CartDrawer({ open, onClose }) {
                   <div style={{
                     position: 'absolute',
                     inset: 0,
-                    backgroundImage: GRAIN,
+                    backgroundImage: PAPER_GRAIN_BACKGROUND,
                     backgroundRepeat: 'repeat',
                     pointerEvents: 'none',
                   }} />
@@ -450,14 +436,14 @@ export default function CartDrawer({ open, onClose }) {
                           marginTop: 2,
                           margin: '2px 0 0',
                         }}>
-                          {formatPickupTime(pickupMinutes)}
+                          {formatPickupTimeWithAtPrefix(pickupMinutes)}
                         </p>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <button
-                          onClick={() => adjustPickup(-STEP)}
-                          disabled={pickupMinutes === MIN_PICKUP}
-                          style={{ ...stepperBtn, opacity: pickupMinutes === MIN_PICKUP ? 0.3 : 1 }}
+                          onClick={() => adjustPickup(-PICKUP_STEP)}
+                          disabled={pickupMinutes === PICKUP_MIN_PICKUP}
+                          style={{ ...stepperBtn, opacity: pickupMinutes === PICKUP_MIN_PICKUP ? 0.3 : 1 }}
                         >
                           −
                         </button>
@@ -469,9 +455,9 @@ export default function CartDrawer({ open, onClose }) {
                           width: 40,
                           textAlign: 'center',
                         }}>
-                          {pickupMinutes === 0 ? 'ASAP' : `${pickupMinutes}m`}
-                        </span>
-                        <button onClick={() => adjustPickup(STEP)} style={stepperBtn}>+</button>
+                          {pickupMinutes === PICKUP_MIN_PICKUP ? 'ASAP' : `${pickupMinutes}m`}
+                          </span>
+                        <button onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>+</button>
                       </div>
                     </div>
 
