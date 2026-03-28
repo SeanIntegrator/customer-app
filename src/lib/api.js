@@ -58,8 +58,11 @@ export async function submitOrder(
   return data;
 }
 
-export async function fetchCustomerOrders(authFetch, { status } = {}) {
-  const q = status ? `?status=${encodeURIComponent(status)}` : '';
+export async function fetchCustomerOrders(authFetch, { status, days } = {}) {
+  const params = new URLSearchParams();
+  if (status) params.set('status', status);
+  if (days != null && days !== '') params.set('days', String(days));
+  const q = params.toString() ? `?${params.toString()}` : '';
   const res = await authFetch(`${BASE}/api/customer/orders${q}`);
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.ok) {
@@ -88,4 +91,31 @@ export async function updateCustomerOrder(authFetch, orderId, body) {
     throw new Error(data.error || 'Failed to update order');
   }
   return data.order;
+}
+
+export const GOOGLE_REVIEW_PLACE_URL =
+  'https://search.google.com/local/writereview?placeid=ChIJX2BkhKih2EcRPwV36PubVtA';
+
+/**
+ * @param {typeof fetch} fetchImpl
+ * @param {{ order_id: string | number, rating: number, comment?: string }} body
+ */
+export async function submitOrderFeedback(fetchImpl, body) {
+  const res = await fetchImpl(`${BASE}/api/order-feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      order_id: body.order_id,
+      rating: body.rating,
+      comment: body.comment ?? '',
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) {
+    throw new Error(data.error || 'Could not send feedback');
+  }
+  return {
+    shouldShowGooglePrompt: Boolean(data.shouldShowGooglePrompt),
+    googleReviewUrl: data.googleReviewUrl || GOOGLE_REVIEW_PLACE_URL,
+  };
 }

@@ -3,6 +3,7 @@ import { AnimatePresence } from 'framer-motion';
 import { CartProvider } from './context/CartContext';
 import GoogleOneTap from './components/GoogleOneTap';
 import BottomNav from './components/BottomNav';
+import PostOrderFeedbackLayer from './components/PostOrderFeedbackLayer';
 import Home from './pages/Home';
 import Order from './pages/Order';
 import Profile from './pages/Profile';
@@ -29,6 +30,7 @@ export default function App() {
         </div>
 
         {!hideBottomNav && <BottomNav />}
+        <PostOrderFeedbackLayer />
       </div>
     </CartProvider>
   );

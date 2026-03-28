@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DEMO_LOYALTY, EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { initialsFromName } from '../lib/userDisplay';
+import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
 import { remainingMinutesUntilPickup } from '../lib/pickup';
 import EditOrderModal from '../components/EditOrderModal';
 import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
@@ -13,6 +13,7 @@ import HomeBridgingCta from '../components/home/HomeBridgingCta';
 import HomeEventsSection from '../components/home/HomeEventsSection';
 import HomeEventSignInModal from '../components/home/HomeEventSignInModal';
 import QRModal from '../components/home/QRModal';
+import { getCafeSocket } from '../lib/cafeSocket';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -50,6 +51,30 @@ export default function Home() {
   useEffect(() => {
     refreshLiveOrder();
   }, [refreshLiveOrder, activeOrder?.placedAt, activeOrder?.orderId]);
+
+  const serverLiveOrderRef = useRef(serverLiveOrder);
+  serverLiveOrderRef.current = serverLiveOrder;
+  const refreshLiveOrderRef = useRef(refreshLiveOrder);
+  refreshLiveOrderRef.current = refreshLiveOrder;
+
+  useEffect(() => {
+    const socket = getCafeSocket();
+    if (!socket) return undefined;
+
+    const onKdsCompleted = (payload) => {
+      const cur = serverLiveOrderRef.current;
+      if (!cur) return;
+      const db = payload?.dbOrderId;
+      const sq = payload?.squareOrderId != null ? String(payload.squareOrderId) : '';
+      const match =
+        (db != null && Number(cur.id) === Number(db)) ||
+        (sq !== '' && String(cur.square_order_id) === sq);
+      if (match) refreshLiveOrderRef.current();
+    };
+
+    socket.on('customerOrderCompleted', onKdsCompleted);
+    return () => socket.off('customerOrderCompleted', onKdsCompleted);
+  }, []);
 
   const goldCardModel = (() => {
     if (serverLiveOrder) {
@@ -125,6 +150,10 @@ export default function Home() {
         promo={promo}
         demoLoyalty={DEMO_LOYALTY}
         hidePromotionalChips={goldCardModel != null && !bridgingCtaLoading}
+        orderCount={isAuthenticated ? user?.orderCount ?? 0 : null}
+        memberSinceLabel={isAuthenticated && user?.createdAt ? formatMemberSince(user.createdAt) : null}
+        pastEventsCount={PAST_EVENTS.length}
+        registeredEventsCount={registeredEvents.length}
       />
 
       <HomeBridgingCta

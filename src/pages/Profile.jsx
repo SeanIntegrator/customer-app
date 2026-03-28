@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DEMO_LOYALTY, ORDER_HISTORY, EVENTS, PAST_EVENTS, USUAL_ORDER } from '../data/mock';
+import { DEMO_LOYALTY, EVENTS, PAST_EVENTS } from '../data/mock';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { initialsFromName } from '../lib/userDisplay';
+import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
+import { fetchCustomerOrders } from '../lib/api';
+import { findUsualOrderFromHistory, apiOrderItemsToCartLines } from '../lib/usualOrder';
 import SignInButton from '../components/SignInButton';
 
 const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E")`;
@@ -114,22 +117,86 @@ function SectionHead({ label, title, action }) {
 
 // ── PAGE ─────────────────────────────────────────────────────────────────
 
+function formatHistoryOrderDate(iso) {
+  if (!iso) return '';
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function orderSummaryLine(order) {
+  const items = order.items || [];
+  return items.map((it) => (it.quantity > 1 ? `${it.quantity}× ` : '') + (it.item_name || 'Item')).join(', ');
+}
+
 export default function Profile() {
-  const { activeOrder, clearActiveOrder } = useCart();
-  const { user, isAuthenticated, logout, loading } = useAuth();
-  const [usual, setUsual] = useState(USUAL_ORDER);
-  const [editingUsual, setEditingUsual] = useState(false);
+  const navigate = useNavigate();
+  const { activeOrder, clearActiveOrder, replaceCartLines } = useCart();
+  const { user, isAuthenticated, logout, loading, authFetch } = useAuth();
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [ratings, setRatings] = useState({});
   const [events, setEvents] = useState(EVENTS);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [completedOrders, setCompletedOrders] = useState([]);
+  const [ordersForUsual, setOrdersForUsual] = useState([]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setCompletedOrders([]);
+      setOrdersForUsual([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      setOrdersLoading(true);
+      try {
+        const [completed, forUsual] = await Promise.all([
+          fetchCustomerOrders(authFetch, { status: 'completed' }),
+          fetchCustomerOrders(authFetch, { status: 'completed', days: 60 }),
+        ]);
+        if (!cancelled) {
+          setCompletedOrders(completed);
+          setOrdersForUsual(forUsual);
+        }
+      } catch {
+        if (!cancelled) {
+          setCompletedOrders([]);
+          setOrdersForUsual([]);
+        }
+      } finally {
+        if (!cancelled) setOrdersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, authFetch]);
+
+  const usualResult = useMemo(() => findUsualOrderFromHistory(ordersForUsual), [ordersForUsual]);
 
   const upcomingEvents = events.filter((e) => e.registered);
   const displayName = user?.displayName ?? 'Guest';
   const profileInitials = user ? initialsFromName(user.displayName) : 'G';
-  const heroFirstName = isAuthenticated ? `${user.displayName.split(/\s+/)[0]}.` : 'Friend.';
+  const heroFirstName = isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Friend.';
+  const memberSinceLabel = user?.createdAt ? formatMemberSince(user.createdAt) : null;
+  const orderCount = user?.orderCount ?? 0;
+  const eventsEngagementCount = PAST_EVENTS.length + upcomingEvents.length;
+
   const handleRate = (id, stars) => setRatings((r) => ({ ...r, [id]: stars }));
-  const removeUsual = (catalogObjectId) => setUsual((u) => u.filter((i) => i.catalogObjectId !== catalogObjectId));
   const toggleEvent = (id) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
+
+  const handleLoadUsualToCart = () => {
+    if (!usualResult?.items?.length) return;
+    replaceCartLines(apiOrderItemsToCartLines(usualResult.items));
+    navigate('/order');
+  };
 
   return (
     <motion.div
@@ -172,7 +239,23 @@ export default function Profile() {
         >
           <svg width={44} height={105} viewBox="0 0 50 120" fill="none">
             <path d="M25 118 C25 100 25 15 25 4" stroke="#6aaa6a" strokeWidth="1.4" strokeLinecap="round" />
-            {[22, 40, 58, 76, 94].map((cy, i) => { const w = 22 - i * 2; return (<g key={i}><path d={`M25 ${cy} C${25-w} ${cy-10} ${25-w-8} ${cy} ${25-w-2} ${cy+10} C${25-6} ${cy+14} 25 ${cy}`} fill="#4a8a4a" opacity={0.75 - i*0.09} /><path d={`M25 ${cy} C${25+w} ${cy-10} ${25+w+8} ${cy} ${25+w+2} ${cy+10} C${25+6} ${cy+14} 25 ${cy}`} fill="#4a8a4a" opacity={0.68 - i*0.09} /></g>); })}
+            {[22, 40, 58, 76, 94].map((cy, i) => {
+              const w = 22 - i * 2;
+              return (
+                <g key={i}>
+                  <path
+                    d={`M25 ${cy} C${25 - w} ${cy - 10} ${25 - w - 8} ${cy} ${25 - w - 2} ${cy + 10} C${25 - 6} ${cy + 14} ${25 - 3} ${cy + 5} 25 ${cy}`}
+                    fill="#4a8a4a"
+                    opacity={0.75 - i * 0.09}
+                  />
+                  <path
+                    d={`M25 ${cy} C${25 + w} ${cy - 10} ${25 + w + 8} ${cy} ${25 + w + 2} ${cy + 10} C${25 + 6} ${cy + 14} ${25 + 3} ${cy + 5} 25 ${cy}`}
+                    fill="#4a8a4a"
+                    opacity={0.68 - i * 0.09}
+                  />
+                </g>
+              );
+            })}
           </svg>
         </motion.div>
 
@@ -221,7 +304,9 @@ export default function Profile() {
               </h1>
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(240,230,208,0.5)' }}>
                 {isAuthenticated
-                  ? `Demo loyalty · Member since ${DEMO_LOYALTY.memberSince}`
+                  ? memberSinceLabel
+                    ? `Member since ${memberSinceLabel} · ${orderCount} order${orderCount === 1 ? '' : 's'}`
+                    : `${orderCount} order${orderCount === 1 ? '' : 's'} with Clay & Bean`
                   : 'Sign in with Google to sync orders and rewards'}
               </p>
             </motion.div>
@@ -235,9 +320,9 @@ export default function Profile() {
             style={{ display: 'flex', gap: 8 }}
           >
             {[
-              { label: 'Orders', value: DEMO_LOYALTY.totalOrders },
+              { label: 'Orders', value: isAuthenticated ? String(orderCount) : '—' },
               { label: 'Stamps', value: `${DEMO_LOYALTY.stamps}/${DEMO_LOYALTY.stampsGoal}` },
-              { label: 'Events', value: PAST_EVENTS.length + upcomingEvents.length },
+              { label: 'Events', value: String(eventsEngagementCount) },
             ].map(({ label, value }) => (
               <div key={label} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 100, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
                 <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#f0e6d0' }}>{value}</span>
@@ -477,73 +562,85 @@ export default function Profile() {
           </div>
         </motion.section>
 
-        {/* ── YOUR USUAL ──────────────────────────────────────────── */}
+        {/* ── YOUR USUAL (from order history) ─────────────────────── */}
         <motion.section
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, type: 'spring', stiffness: 260, damping: 28 }}
         >
-          <SectionHead
-            label="Saved order"
-            title="Your usual"
-            action={
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                onClick={() => setEditingUsual((v) => !v)}
-                style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, color: editingUsual ? '#f0e6d0' : 'rgba(26,46,26,0.6)', background: editingUsual ? '#1a2e1a' : 'rgba(26,46,26,0.08)', border: editingUsual ? 'none' : '1.5px solid #d4c0a0', borderRadius: 100, padding: '5px 13px', cursor: 'pointer', letterSpacing: '0.02em' }}
-              >
-                {editingUsual ? 'Done' : 'Edit'}
-              </motion.button>
-            }
-          />
+          <SectionHead label="Saved order" title="Your usual" />
 
-          {usual.length === 0 ? (
+          {!isAuthenticated ? (
+            <div style={{ background: 'rgba(255,255,255,0.45)', border: '1.5px solid #e0d0b0', borderRadius: 18, padding: '22px 18px', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: '#1a2e1a', margin: '0 0 8px' }}>Sign in to see your usual</p>
+              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', margin: '0 0 14px', lineHeight: 1.45 }}>
+                We detect when you order the same items (including modifiers) more than three times in two months — then you can load that order in one tap.
+              </p>
+              <SignInButton />
+            </div>
+          ) : ordersLoading ? (
+            <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#8a7868' }}>Checking your orders…</div>
+          ) : !usualResult ? (
             <div style={{ background: 'rgba(255,255,255,0.4)', border: '1.5px dashed #d4c0a0', borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: 'rgba(26,46,26,0.4)', marginBottom: 4 }}>No usual saved</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.3)' }}>Tap any item in the menu to add it to your usual</p>
+              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: 'rgba(26,46,26,0.45)', marginBottom: 6 }}>No usual yet</p>
+              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.35)', lineHeight: 1.5 }}>
+                Order the exact same basket (every item and modifier) at least four times within two months — we&apos;ll surface it here so you can reorder instantly.
+              </p>
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <AnimatePresence>
-                {usual.map((item) => (
-                  <motion.div
-                    key={item.catalogObjectId}
-                    layout
-                    initial={{ opacity: 0, x: -12 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 24, height: 0, marginBottom: 0 }}
-                    transition={{ type: 'spring', stiffness: 300, damping: 26 }}
-                    style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 18, padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 14 }}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)', margin: 0 }}>
+                You&apos;ve ordered this {usualResult.matchCount} times in the last 2 months.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {usualResult.items.map((it) => (
+                  <div
+                    key={it.id}
+                    style={{
+                      background: 'linear-gradient(148deg, #fef9f0, #f5ead8)',
+                      border: '1.5px solid #e0d0b0',
+                      borderRadius: 18,
+                      padding: '14px 16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 14,
+                    }}
                   >
                     <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(145deg, #f5e5b8, #e8cc88)', border: '2px solid #f0e6d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-                      {item.emoji}
+                      {it.item_emoji || '☕'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 15, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
-                        {item.name}
+                        {it.quantity > 1 ? `${it.quantity}× ` : ''}
+                        {it.item_name}
                       </p>
                       <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)' }}>
-                        {[item.size !== 'Regular' && item.size, item.milk !== 'Full Fat' && item.milk].filter(Boolean).join(', ') || 'Regular'}
-                        {' · '}£{(item.totalPrice / 100).toFixed(2)}
+                        £{((it.unit_price * it.quantity) / 100).toFixed(2)}
                       </p>
                     </div>
-                    <AnimatePresence>
-                      {editingUsual && (
-                        <motion.button
-                          initial={{ opacity: 0, scale: 0.6 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.6 }}
-                          whileTap={{ scale: 0.85 }}
-                          onClick={() => removeUsual(item.catalogObjectId)}
-                          style={{ width: 28, height: 28, borderRadius: '50%', background: 'rgba(179,74,42,0.12)', border: '1.5px solid rgba(179,74,42,0.3)', color: '#b34a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0, fontSize: 14, fontWeight: 700 }}
-                        >
-                          ×
-                        </motion.button>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
+                  </div>
                 ))}
-              </AnimatePresence>
+              </div>
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.98 }}
+                onClick={handleLoadUsualToCart}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                  color: '#122012',
+                  border: 'none',
+                  borderRadius: 16,
+                  padding: '14px 18px',
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 16,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 18px rgba(200,144,42,0.35)',
+                }}
+              >
+                Replace basket with this order
+              </motion.button>
             </div>
           )}
         </motion.section>
@@ -626,76 +723,96 @@ export default function Profile() {
         >
           <SectionHead label="History" title="Past orders" />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {ORDER_HISTORY.map((order, idx) => (
-              <motion.div
-                key={order.id}
-                layout
-                style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 18, overflow: 'hidden' }}
-              >
-                <button
-                  onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-                  style={{ width: '100%', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 12 }}
+          {!isAuthenticated ? (
+            <div style={{ background: 'rgba(255,255,255,0.45)', border: '1.5px solid #e0d0b0', borderRadius: 18, padding: '22px 18px', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: '#1a2e1a', margin: '0 0 8px' }}>Sign in to see your order history</p>
+              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', margin: '0 0 14px', lineHeight: 1.45 }}>
+                Your completed orders from Clay & Bean will appear here.
+              </p>
+              <SignInButton />
+            </div>
+          ) : ordersLoading ? (
+            <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#8a7868' }}>Loading history…</div>
+          ) : completedOrders.length === 0 ? (
+            <div style={{ background: 'rgba(255,255,255,0.4)', border: '1.5px dashed #d4c0a0', borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
+              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: 'rgba(26,46,26,0.45)', marginBottom: 4 }}>No past orders yet</p>
+              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.35)' }}>When you complete an order, it will show up here.</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {completedOrders.map((order, idx) => (
+                <motion.div
+                  key={order.id}
+                  layout
+                  style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 18, overflow: 'hidden' }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(26,46,26,0.07)', border: '1.5px solid #d4c0a0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 11, fontWeight: 800, color: 'rgba(26,46,26,0.4)' }}>
-                        {ORDER_HISTORY.length - idx}
-                      </span>
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
-                        {order.date}
-                      </p>
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {order.items.join(', ')}
-                      </p>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                    <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#1a2e1a' }}>
-                      £{order.total.toFixed(2)}
-                    </span>
-                    <motion.span
-                      animate={{ rotate: expandedOrder === order.id ? 180 : 0 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                      style={{ display: 'inline-block', color: 'rgba(26,46,26,0.35)', fontSize: 12 }}
-                    >
-                      ↓
-                    </motion.span>
-                  </div>
-                </button>
-
-                <AnimatePresence>
-                  {expandedOrder === order.id && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: 'auto', opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: 'easeInOut' }}
-                      style={{ overflow: 'hidden' }}
-                    >
-                      <div style={{ borderTop: '1px solid rgba(26,46,26,0.08)', padding: '12px 16px 14px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                          {order.items.map((item, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#c8902a', flexShrink: 0 }} />
-                              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#1a2e1a' }}>
-                                {item}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                        <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.3)', letterSpacing: '0.06em' }}>
-                          {order.id}
+                  <button
+                    type="button"
+                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                    style={{ width: '100%', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 12 }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(26,46,26,0.07)', border: '1.5px solid #d4c0a0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 11, fontWeight: 800, color: 'rgba(26,46,26,0.4)' }}>
+                          {completedOrders.length - idx}
+                        </span>
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
+                          {formatHistoryOrderDate(order.created_at)}
+                        </p>
+                        <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {orderSummaryLine(order)}
                         </p>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </motion.div>
-            ))}
-          </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#1a2e1a' }}>
+                        £{(order.total_amount / 100).toFixed(2)}
+                      </span>
+                      <motion.span
+                        animate={{ rotate: expandedOrder === order.id ? 180 : 0 }}
+                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                        style={{ display: 'inline-block', color: 'rgba(26,46,26,0.35)', fontSize: 12 }}
+                      >
+                        ↓
+                      </motion.span>
+                    </div>
+                  </button>
+
+                  <AnimatePresence>
+                    {expandedOrder === order.id && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.22, ease: 'easeInOut' }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div style={{ borderTop: '1px solid rgba(26,46,26,0.08)', padding: '12px 16px 14px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                            {(order.items || []).map((line) => (
+                              <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#c8902a', flexShrink: 0 }} />
+                                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#1a2e1a' }}>
+                                  {line.quantity > 1 ? `${line.quantity}× ` : ''}
+                                  {line.item_name}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.3)', letterSpacing: '0.06em' }}>
+                            Order #{order.id}
+                            {order.square_order_id ? ` · ${order.square_order_id}` : ''}
+                          </p>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </motion.section>
 
         {/* ── PAST EVENTS — with star ratings ─────────────────────── */}

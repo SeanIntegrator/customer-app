@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import { createContext, useContext, useState, useCallback, useRef } from 'react';
 
 const CartContext = createContext(null);
 
@@ -11,7 +11,50 @@ export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [editOrderId, setEditOrderId] = useState(null);
+  /** Opens the feedback sheet (after KDS marks the matching order complete). */
+  const [postCheckoutFeedbackOrderId, setPostCheckoutFeedbackOrderId] = useState(null);
+  /** @type {React.MutableRefObject<{ dbOrderId: number, squareOrderId: string }[]>} */
+  const pendingKdsFeedbackRef = useRef([]);
   const clearActiveOrder = useCallback(() => setActiveOrder(null), []);
+  const beginPostCheckoutFeedback = useCallback((orderId) => {
+    if (orderId == null || orderId === '') return;
+    setPostCheckoutFeedbackOrderId(orderId);
+  }, []);
+  const clearPostCheckoutFeedback = useCallback(() => setPostCheckoutFeedbackOrderId(null), []);
+
+  const registerPendingKdsFeedback = useCallback(({ dbOrderId, squareOrderId }) => {
+    if (dbOrderId == null || squareOrderId == null || squareOrderId === '') return;
+    pendingKdsFeedbackRef.current.push({
+      dbOrderId: Number(dbOrderId),
+      squareOrderId: String(squareOrderId),
+    });
+  }, []);
+
+  const applyKdsOrderCompleted = useCallback(
+    (payload) => {
+      const incomingDb = payload?.dbOrderId;
+      const sq = payload?.squareOrderId != null ? String(payload.squareOrderId) : '';
+
+      setActiveOrder((prev) => {
+        if (!prev) return prev;
+        const matchDb = incomingDb != null && Number(prev.dbOrderId) === Number(incomingDb);
+        const matchSq = sq !== '' && String(prev.squareOrderId) === sq;
+        if (matchDb || matchSq) return null;
+        return prev;
+      });
+
+      const list = pendingKdsFeedbackRef.current;
+      const idx = list.findIndex(
+        (o) =>
+          (incomingDb != null && Number(o.dbOrderId) === Number(incomingDb)) ||
+          (sq !== '' && o.squareOrderId === sq)
+      );
+      if (idx === -1) return;
+      const [hit] = list.splice(idx, 1);
+      beginPostCheckoutFeedback(hit.dbOrderId);
+    },
+    [beginPostCheckoutFeedback]
+  );
 
   const addItem = useCallback((item) => {
     setItems((prev) => {
@@ -73,6 +116,12 @@ export function CartProvider({ children }) {
     setEditOrderId(null);
   }, []);
 
+  /** Replace cart with lines (e.g. usual order); clears edit mode. */
+  const replaceCartLines = useCallback((lines) => {
+    setEditOrderId(null);
+    setItems(Array.isArray(lines) ? lines : []);
+  }, []);
+
   const totalItems = items.reduce((s, i) => s + i.quantity, 0);
   const subtotal = items.reduce((s, i) => s + i.totalPrice * i.quantity, 0);
 
@@ -93,6 +142,12 @@ export function CartProvider({ children }) {
         setEditOrderId,
         loadCartFromOrderEdit,
         clearEditMode,
+        replaceCartLines,
+        postCheckoutFeedbackOrderId,
+        beginPostCheckoutFeedback,
+        clearPostCheckoutFeedback,
+        registerPendingKdsFeedback,
+        applyKdsOrderCompleted,
       }}
     >
       {children}

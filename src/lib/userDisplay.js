@@ -1,3 +1,13 @@
+/** e.g. "March 2025" from ISO date string */
+export function formatMemberSince(iso) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  } catch {
+    return null;
+  }
+}
+
 /** Derive 1–2 letter initials from a display name. */
 export function initialsFromName(name) {
   if (!name || typeof name !== 'string') return '?';

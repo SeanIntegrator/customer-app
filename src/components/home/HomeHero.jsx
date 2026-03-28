@@ -15,6 +15,10 @@ export default function HomeHero({
   demoLoyalty,
   /** When true (active gold card), hide event/promo chips and use a shorter hero. */
   hidePromotionalChips = false,
+  orderCount = null,
+  memberSinceLabel = null,
+  pastEventsCount = 0,
+  registeredEventsCount = 0,
 }) {
   const heroHeight = hidePromotionalChips ? 'clamp(240px, 48vh, 480px)' : 'clamp(280px, 52vh, 560px)';
   const heroPaddingTop = hidePromotionalChips ? 32 : 40;
@@ -87,6 +91,7 @@ export default function HomeHero({
               ✦ {getHomeGreeting()},
             </p>
             <h1 style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 50, fontWeight: 900, color: '#f0e6d0', letterSpacing: '-0.035em', lineHeight: 0.92, textShadow: '0 2px 30px rgba(0,0,0,0.3)' }}>{heroFirstName}</h1>
+           
           </motion.div>
 
           <motion.button
@@ -122,6 +127,8 @@ export default function HomeHero({
             )}
           </motion.button>
         </div>
+
+      
       </div>
 
       <div style={{ flex: hidePromotionalChips ? 0.22 : 0.32 }} />
@@ -154,7 +161,7 @@ export default function HomeHero({
                 }}
                 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, color: '#f0e6d0', background: '#1a2e1a', border: 'none', borderRadius: 100, padding: '4px 11px', cursor: 'pointer', letterSpacing: '0.02em' }}
               >
-                ★ My rewards · 1
+                ★ Stamps · {demoLoyalty.stamps}/{demoLoyalty.stampsGoal}
               </motion.button>
             </div>
 

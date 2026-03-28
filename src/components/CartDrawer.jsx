@@ -28,8 +28,10 @@ export default function CartDrawer({ open, onClose }) {
     clearCart,
     subtotal,
     setActiveOrder,
+    activeOrder,
     editOrderId,
     clearEditMode,
+    registerPendingKdsFeedback,
   } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -133,6 +135,16 @@ export default function CartDrawer({ open, onClose }) {
   };
 
   const handleSuccessDone = () => {
+    if (
+      orderSuccessVariant === 'placed' &&
+      activeOrder?.dbOrderId != null &&
+      activeOrder?.squareOrderId
+    ) {
+      registerPendingKdsFeedback({
+        dbOrderId: activeOrder.dbOrderId,
+        squareOrderId: activeOrder.squareOrderId,
+      });
+    }
     onClose();
     setOrderNote('');
     setPickupMinutes(DEFAULT_PICKUP_MINUTES);
