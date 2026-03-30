@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { fetchCustomerOrder, updateCustomerOrder } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import OrderSuccess from './OrderSuccess';
+import AllergyChipsInput from './AllergyChipsInput';
 import {
   PAPER_GRAIN_BACKGROUND,
   PICKUP_STEP,
@@ -26,7 +27,8 @@ export default function EditOrderModal({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [note, setNote] = useState('');
+  const [allergens, setAllergens] = useState([]);
+  const [allergyToggle, setAllergyToggle] = useState(false);
   const [pickupMinutes, setPickupMinutes] = useState(10);
   const [lines, setLines] = useState([]);
   const [status, setStatus] = useState('');
@@ -63,7 +65,9 @@ export default function EditOrderModal({
       try {
         const o = await fetchCustomerOrder(authFetch, orderId);
         if (cancelled) return;
-        setNote(o.notes || '');
+        const ag = Array.isArray(o.allergens) ? o.allergens.map((x) => String(x).trim()).filter(Boolean) : [];
+        setAllergens(ag);
+        setAllergyToggle(ag.length > 0);
         setPickupMinutes(pickupIsoToStepperMinutes(o.pickup_time));
         setStatus(o.status || '');
         setLines(
@@ -75,6 +79,7 @@ export default function EditOrderModal({
             quantity: it.quantity,
             unit_price: it.unit_price,
             modifiers: it.modifiers || [],
+            customer_note: it.customer_note != null ? String(it.customer_note) : '',
           }))
         );
       } catch (e) {
@@ -109,6 +114,10 @@ export default function EditOrderModal({
     });
   };
 
+  const setLineCustomerNote = (key, text) => {
+    setLines((prev) => prev.map((l) => (l.key === key ? { ...l, customer_note: text } : l)));
+  };
+
   const subtotal = lines.reduce((s, l) => s + l.unit_price * l.quantity, 0);
 
   const handleSave = async () => {
@@ -116,18 +125,24 @@ export default function EditOrderModal({
     setSaving(true);
     setError(null);
     try {
+      const allergenPayload = allergyToggle ? allergens : [];
       await updateCustomerOrder(authFetch, orderId, {
         customer_name: user?.displayName ?? 'Customer',
-        note,
+        note: null,
+        allergens: allergenPayload,
         pickup_minutes: pickupMinutes,
-        line_items: lines.map((l) => ({
-          catalog_object_id: l.square_variation_id,
-          quantity: l.quantity,
-          item_name: l.item_name,
-          unit_price: l.unit_price,
-          emoji: l.item_emoji,
-          modifiers: l.modifiers,
-        })),
+        line_items: lines.map((l) => {
+          const cn = (l.customer_note || '').trim();
+          return {
+            catalog_object_id: l.square_variation_id,
+            quantity: l.quantity,
+            item_name: l.item_name,
+            unit_price: l.unit_price,
+            emoji: l.item_emoji,
+            modifiers: l.modifiers,
+            ...(cn ? { customer_note: cn } : {}),
+          };
+        }),
       });
       onSaved?.();
       setUpdateSuccess(true);
@@ -295,111 +310,158 @@ export default function EditOrderModal({
                             </p>
                           )}
                           {lines.map((l) => (
-                            <div
-                              key={l.key}
-                              style={{
-                                background: 'linear-gradient(148deg, #fef9f0 0%, #f5ead8 100%)',
-                                border: '1.5px solid #e0d0b0',
-                                borderRadius: 18,
-                                padding: '12px 14px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 10,
-                              }}
-                            >
-                              <span style={{ fontSize: 26 }}>{l.item_emoji}</span>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <p
-                                  style={{
-                                    fontFamily: 'Fraunces, Georgia, serif',
-                                    fontSize: 14,
-                                    fontWeight: 700,
-                                    color: '#1a2e1a',
-                                    margin: 0,
-                                  }}
-                                >
-                                  {l.item_name}
-                                </p>
-                                <p
-                                  style={{
-                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                                    fontSize: 11,
-                                    color: 'rgba(26,46,26,0.45)',
-                                    margin: '4px 0 0',
-                                  }}
-                                >
-                                  £{(l.unit_price / 100).toFixed(2)} ea.
-                                </p>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <button type="button" onClick={() => bumpQty(l.key, -1)} style={stepperBtn}>
-                                  −
-                                </button>
-                                <span
-                                  style={{
-                                    fontFamily: 'Fraunces, Georgia, serif',
-                                    fontSize: 15,
-                                    fontWeight: 700,
-                                    width: 18,
-                                    textAlign: 'center',
-                                  }}
-                                >
-                                  {l.quantity}
-                                </span>
-                                <button type="button" onClick={() => bumpQty(l.key, 1)} style={stepperBtn}>
-                                  +
-                                </button>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => removeLine(l.key)}
+                            <div key={l.key}>
+                              <div
                                 style={{
-                                  background: 'none',
-                                  border: 'none',
-                                  color: '#b34a2a',
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  background: 'linear-gradient(148deg, #fef9f0 0%, #f5ead8 100%)',
+                                  border: '1.5px solid #e0d0b0',
+                                  borderRadius: 18,
+                                  padding: '12px 14px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
                                 }}
                               >
-                                Remove
-                              </button>
+                                <span style={{ fontSize: 26 }}>{l.item_emoji}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p
+                                    style={{
+                                      fontFamily: 'Fraunces, Georgia, serif',
+                                      fontSize: 14,
+                                      fontWeight: 700,
+                                      color: '#1a2e1a',
+                                      margin: 0,
+                                    }}
+                                  >
+                                    {l.item_name}
+                                  </p>
+                                  <p
+                                    style={{
+                                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                      fontSize: 11,
+                                      color: 'rgba(26,46,26,0.45)',
+                                      margin: '4px 0 0',
+                                    }}
+                                  >
+                                    £{(l.unit_price / 100).toFixed(2)} ea.
+                                  </p>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <button type="button" onClick={() => bumpQty(l.key, -1)} style={stepperBtn}>
+                                    −
+                                  </button>
+                                  <span
+                                    style={{
+                                      fontFamily: 'Fraunces, Georgia, serif',
+                                      fontSize: 15,
+                                      fontWeight: 700,
+                                      width: 18,
+                                      textAlign: 'center',
+                                    }}
+                                  >
+                                    {l.quantity}
+                                  </span>
+                                  <button type="button" onClick={() => bumpQty(l.key, 1)} style={stepperBtn}>
+                                    +
+                                  </button>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => removeLine(l.key)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#b34a2a',
+                                    fontSize: 12,
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                              <textarea
+                                value={l.customer_note || ''}
+                                onChange={(e) => setLineCustomerNote(l.key, e.target.value)}
+                                placeholder="Note for this item (optional)"
+                                rows={2}
+                                style={{
+                                  width: '100%',
+                                  boxSizing: 'border-box',
+                                  marginTop: 8,
+                                  padding: '8px 10px',
+                                  borderRadius: 12,
+                                  border: '1.5px solid #e8dcc8',
+                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  fontSize: 12,
+                                  resize: 'none',
+                                }}
+                              />
                             </div>
                           ))}
                         </div>
 
-                        <label
+                        <div
                           style={{
-                            fontFamily: 'Plus Jakarta Sans, sans-serif',
-                            fontSize: 10,
-                            fontWeight: 700,
-                            letterSpacing: '0.14em',
-                            textTransform: 'uppercase',
-                            color: 'rgba(26,46,26,0.45)',
-                            display: 'block',
-                            marginBottom: 6,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(255,255,255,0.35)',
+                            border: '1.5px solid #e0d0b0',
+                            borderRadius: 16,
+                            padding: '12px 16px',
+                            marginBottom: 10,
                           }}
                         >
-                          Note for barista
-                        </label>
-                        <textarea
-                          value={note}
-                          onChange={(e) => setNote(e.target.value)}
-                          rows={2}
-                          placeholder="Optional"
-                          style={{
-                            width: '100%',
-                            boxSizing: 'border-box',
-                            padding: '12px 14px',
-                            borderRadius: 14,
-                            border: '1.5px solid #e0d0b0',
-                            fontFamily: 'Plus Jakarta Sans, sans-serif',
-                            fontSize: 13,
-                            resize: 'none',
-                            marginBottom: 16,
-                          }}
-                        />
+                          <span
+                            style={{
+                              fontFamily: 'Plus Jakarta Sans, sans-serif',
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: '#1a2e1a',
+                            }}
+                          >
+                            Do you have any allergies?
+                          </span>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={allergyToggle}
+                            onClick={() => {
+                              setAllergyToggle((v) => !v);
+                              if (allergyToggle) setAllergens([]);
+                            }}
+                            style={{
+                              width: 48,
+                              height: 28,
+                              borderRadius: 999,
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
+                              position: 'relative',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: 3,
+                                left: allergyToggle ? 24 : 3,
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: '#f0e6d0',
+                                transition: 'left 0.15s ease',
+                              }}
+                            />
+                          </button>
+                        </div>
+                        {allergyToggle && (
+                          <div style={{ marginBottom: 16 }}>
+                            <AllergyChipsInput value={allergens} onChange={setAllergens} />
+                          </div>
+                        )}
 
                         <div
                           style={{

@@ -7,8 +7,14 @@ function apiModifiersToAlterationNames(mods) {
   return mods.map((m) => (m && typeof m === 'object' ? m.name : m)).filter(Boolean);
 }
 
+function normalizeAllergensFromApi(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((x) => String(x).trim()).filter(Boolean);
+}
+
 export function CartProvider({ children }) {
   const [items, setItems] = useState([]);
+  const [orderAllergens, setOrderAllergens] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [editOrderId, setEditOrderId] = useState(null);
   /** Opens the feedback sheet (after KDS marks the matching order complete). */
@@ -56,25 +62,33 @@ export function CartProvider({ children }) {
     [beginPostCheckoutFeedback]
   );
 
-  const addItem = useCallback((item) => {
-    setItems((prev) => {
-      const altKey = (i) => (i.alterations ?? []).slice().sort().join(',');
-      const key = `${item.catalogObjectId}|${item.size}|${item.milk}|${item.syrup ?? 'none'}|${altKey(item)}`;
-      const existing = prev.find((i) => `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}` === key);
-      if (existing) {
-        return prev.map((i) =>
-          `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}` === key
-            ? {
-                ...i,
-                quantity: i.quantity + (item.quantity ?? 1),
-                fromExistingOrder: Boolean(i.fromExistingOrder || item.fromExistingOrder),
-              }
-            : i
-        );
-      }
-      return [...prev, { ...item, quantity: item.quantity ?? 1, fromExistingOrder: item.fromExistingOrder ?? false }];
-    });
+  const lineDedupeKey = useCallback((i) => {
+    const altKey = (x) => (x.alterations ?? []).slice().sort().join(',');
+    const note = (i.customerNote ?? '').trim();
+    return `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}|${note}`;
   }, []);
+
+  const addItem = useCallback(
+    (item) => {
+      setItems((prev) => {
+        const key = lineDedupeKey(item);
+        const existing = prev.find((i) => lineDedupeKey(i) === key);
+        if (existing) {
+          return prev.map((i) =>
+            lineDedupeKey(i) === key
+              ? {
+                  ...i,
+                  quantity: i.quantity + (item.quantity ?? 1),
+                  fromExistingOrder: Boolean(i.fromExistingOrder || item.fromExistingOrder),
+                }
+              : i
+          );
+        }
+        return [...prev, { ...item, quantity: item.quantity ?? 1, fromExistingOrder: item.fromExistingOrder ?? false }];
+      });
+    },
+    [lineDedupeKey]
+  );
 
   const removeItem = useCallback((cartId) => {
     setItems((prev) => prev.filter((i) => i.cartId !== cartId));
@@ -88,37 +102,58 @@ export function CartProvider({ children }) {
     );
   }, []);
 
-  const clearCart = useCallback(() => setItems([]), []);
+  const updateCartLine = useCallback((cartId, updates) => {
+    setItems((prev) =>
+      prev.map((i) => (i.cartId === cartId ? { ...i, ...updates } : i))
+    );
+  }, []);
+
+  const clearCart = useCallback(() => {
+    setItems([]);
+    setOrderAllergens([]);
+  }, []);
 
   /** Pre-fill cart from API order shape; opening menu to add more items before PATCH checkout. */
   const loadCartFromOrderEdit = useCallback((apiOrder) => {
     if (!apiOrder?.id) return;
     setEditOrderId(apiOrder.id);
+    setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
     setItems(
-      (apiOrder.items || []).map((it, idx) => ({
-        cartId: `edit-${it.id}-${idx}`,
-        catalogObjectId: it.square_variation_id,
-        name: it.item_name,
-        emoji: it.item_emoji || '☕',
-        category: 'coffee',
-        size: 'Regular',
-        milk: 'Full Fat',
-        syrup: null,
-        alterations: apiModifiersToAlterationNames(it.modifiers),
-        quantity: it.quantity,
-        totalPrice: it.unit_price,
-        fromExistingOrder: true,
-      }))
+      (apiOrder.items || []).map((it, idx) => {
+        const nm = (it.item_name || '').toLowerCase();
+        const showCoffeeOptions = [
+          'coffee', 'latte', 'tea', 'matcha', 'chai', 'mocha', 'cappuccino', 'americano',
+          'espresso', 'macchiato', 'flat white', 'hot chocolate', 'chocolate', 'drink',
+        ].some((w) => nm.includes(w));
+        return {
+          cartId: `edit-${it.id}-${idx}`,
+          catalogObjectId: it.square_variation_id,
+          name: it.item_name,
+          emoji: it.item_emoji || '☕',
+          category: showCoffeeOptions ? 'coffee' : 'food',
+          showCoffeeOptions,
+          size: 'Regular',
+          milk: 'Full Fat',
+          syrup: null,
+          alterations: apiModifiersToAlterationNames(it.modifiers),
+          quantity: it.quantity,
+          totalPrice: it.unit_price,
+          fromExistingOrder: true,
+          customerNote: it.customer_note != null ? String(it.customer_note) : '',
+        };
+      })
     );
   }, []);
 
   const clearEditMode = useCallback(() => {
     setEditOrderId(null);
+    setOrderAllergens([]);
   }, []);
 
   /** Replace cart with lines (e.g. usual order); clears edit mode. */
-  const replaceCartLines = useCallback((lines) => {
+  const replaceCartLines = useCallback((lines, opts = {}) => {
     setEditOrderId(null);
+    setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
     setItems(Array.isArray(lines) ? lines : []);
   }, []);
 
@@ -132,9 +167,12 @@ export function CartProvider({ children }) {
         addItem,
         removeItem,
         updateQuantity,
+        updateCartLine,
         clearCart,
         totalItems,
         subtotal,
+        orderAllergens,
+        setOrderAllergens,
         activeOrder,
         setActiveOrder,
         clearActiveOrder,

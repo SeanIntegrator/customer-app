@@ -10,6 +10,7 @@ export function orderLineItemsFromCartItems(cartItems) {
     if (item.milk && !DEFAULT_MILKS.includes(item.milk)) mods.push({ name: item.milk, price: 0 });
     if (item.syrup) mods.push({ name: `${item.syrup} syrup`, price: 0 });
     for (const a of item.alterations ?? []) mods.push({ name: a, price: 0 });
+    const cn = item.customerNote != null ? String(item.customerNote).trim() : '';
     return {
       catalog_object_id: item.catalogObjectId,
       quantity: item.quantity,
@@ -17,6 +18,7 @@ export function orderLineItemsFromCartItems(cartItems) {
       unit_price: item.totalPrice,
       emoji: item.emoji,
       modifiers: mods,
+      ...(cn ? { customer_note: cn } : {}),
     };
   });
 }
@@ -36,8 +38,36 @@ export async function fetchCatalogItems() {
   return data.items ?? [];
 }
 
+export async function createCheckoutSession(authFetch, body) {
+  const res = await authFetch(`${BASE}/api/stripe/create-checkout-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Could not start checkout');
+  }
+  return { sessionId: data.sessionId, url: data.url };
+}
+
+export async function fetchOrderByCheckoutSession(authFetch, sessionId) {
+  const q = new URLSearchParams({ session_id: sessionId });
+  const res = await authFetch(`${BASE}/api/customer/order-by-checkout-session?${q}`);
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 404) {
+    const err = new Error('Not ready');
+    err.code = 'NOT_READY';
+    throw err;
+  }
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Failed to load order');
+  }
+  return data.order;
+}
+
 export async function submitOrder(
-  { cartItems, customerName, note, pickupMinutes },
+  { cartItems, customerName, pickupMinutes, allergens = [] },
   fetchImpl = fetch
 ) {
   const line_items = orderLineItemsFromCartItems(cartItems);
@@ -47,8 +77,8 @@ export async function submitOrder(
     body: JSON.stringify({
       line_items,
       customer_name: customerName,
-      note,
       pickup_minutes: pickupMinutes ?? 15,
+      allergens,
     }),
   });
   const data = await res.json().catch(() => ({}));

@@ -18,7 +18,8 @@ export function orderItemsFingerprint(items) {
   for (const it of items) {
     const vid = it.square_variation_id || '';
     const mods = modifierNamesForFingerprint(it.modifiers).join('\u001f');
-    const key = `${vid}\u001e${mods}`;
+    const note = String(it.customer_note || '').trim();
+    const key = `${vid}\u001e${mods}\u001e${note}`;
     const q = parseInt(String(it.quantity), 10) || 1;
     buckets.set(key, (buckets.get(key) || 0) + q);
   }
@@ -26,6 +27,19 @@ export function orderItemsFingerprint(items) {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, q]) => `${k}\u001d${q}`)
     .join('\u001c');
+}
+
+/** Full-order fingerprint including line-level notes and order-level allergens (for “usual order”). */
+export function orderFingerprintForUsual(order) {
+  const itemsFp = orderItemsFingerprint(order?.items || []);
+  const ag = Array.isArray(order?.allergens)
+    ? order.allergens
+        .map((x) => String(x).trim())
+        .filter(Boolean)
+        .sort()
+        .join('\u001f')
+    : '';
+  return `${itemsFp}\u001cA:${ag}`;
 }
 
 const DEFAULT_WINDOW_MS = 60 * 24 * 60 * 60 * 1000;
@@ -46,14 +60,15 @@ export function findUsualOrderFromHistory(orders, windowMs = DEFAULT_WINDOW_MS) 
 
   const fpMap = new Map();
   for (const o of recent) {
-    const fp = orderItemsFingerprint(o.items);
+    const fp = orderFingerprintForUsual(o);
     if (!fp) continue;
-    const cur = fpMap.get(fp) || { count: 0, lastTs: 0, representative: null };
+    const cur = fpMap.get(fp) || { count: 0, lastTs: 0, representativeItems: null, representativeAllergens: [] };
     cur.count += 1;
     const ts = new Date(o.created_at).getTime();
     if (ts >= cur.lastTs) {
       cur.lastTs = ts;
-      cur.representative = o.items;
+      cur.representativeItems = o.items;
+      cur.representativeAllergens = Array.isArray(o.allergens) ? o.allergens.map((x) => String(x).trim()).filter(Boolean) : [];
     }
     fpMap.set(fp, cur);
   }
@@ -66,8 +81,12 @@ export function findUsualOrderFromHistory(orders, windowMs = DEFAULT_WINDOW_MS) 
     }
   }
 
-  if (!best?.representative?.length) return null;
-  return { items: best.representative, matchCount: best.count };
+  if (!best?.representativeItems?.length) return null;
+  return {
+    items: best.representativeItems,
+    allergens: best.representativeAllergens || [],
+    matchCount: best.count,
+  };
 }
 
 /** Map API order items to cart line shape (new order, not edit mode). */
@@ -80,12 +99,18 @@ export function apiOrderItemsToCartLines(items) {
         alterations.push(String(m.name));
       }
     }
+    const nm = (it.item_name || '').toLowerCase();
+    const showCoffeeOptions = [
+      'coffee', 'latte', 'tea', 'matcha', 'chai', 'mocha', 'cappuccino', 'americano',
+      'espresso', 'macchiato', 'flat white', 'hot chocolate', 'chocolate', 'drink',
+    ].some((w) => nm.includes(w));
     return {
       cartId: `usual-${it.id}-${idx}`,
       catalogObjectId: it.square_variation_id,
       name: it.item_name,
       emoji: it.item_emoji || '☕',
-      category: 'coffee',
+      category: showCoffeeOptions ? 'coffee' : 'food',
+      showCoffeeOptions,
       size: 'Regular',
       milk: 'Full Fat',
       syrup: null,
@@ -93,6 +118,7 @@ export function apiOrderItemsToCartLines(items) {
       quantity: it.quantity || 1,
       totalPrice: it.unit_price,
       fromExistingOrder: false,
+      customerNote: it.customer_note != null ? String(it.customer_note) : '',
     };
   });
 }

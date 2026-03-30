@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
-import { submitOrder, orderLineItemsFromCartItems, updateCustomerOrder } from '../lib/api';
+import { loadStripe } from '@stripe/stripe-js';
+import { createCheckoutSession, orderLineItemsFromCartItems, updateCustomerOrder } from '../lib/api';
 import OrderSuccess from './OrderSuccess';
 import SignInButton from './SignInButton';
+import AllergyChipsInput from './AllergyChipsInput';
 import {
   PAPER_GRAIN_BACKGROUND,
   PICKUP_MIN_PICKUP,
@@ -16,11 +18,17 @@ import {
   formatPickupTimeWithAtPrefix,
 } from '../lib/pickup';
 
-const DEFAULT_MILKS = ['Full Fat', 'Regular'];
-
 const stepperBtn = checkoutStepperButtonStyle;
 
-export default function CartDrawer({ open, onClose }) {
+function PenIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />
+    </svg>
+  );
+}
+
+export default function CartDrawer({ open, onClose, onEditLine }) {
   const navigate = useNavigate();
   const {
     items,
@@ -32,6 +40,8 @@ export default function CartDrawer({ open, onClose }) {
     editOrderId,
     clearEditMode,
     registerPendingKdsFeedback,
+    orderAllergens,
+    setOrderAllergens,
   } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +49,8 @@ export default function CartDrawer({ open, onClose }) {
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderSuccessVariant, setOrderSuccessVariant] = useState('placed');
   const [pickupMinutes, setPickupMinutes] = useState(DEFAULT_PICKUP_MINUTES);
-  const [orderNote, setOrderNote] = useState('');
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
+  const [allergyToggle, setAllergyToggle] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) setShowCheckoutSignIn(false);
@@ -52,6 +62,10 @@ export default function CartDrawer({ open, onClose }) {
       setOrderSuccessVariant('placed');
     }
   }, [open]);
+
+  useEffect(() => {
+    if (open && orderAllergens.length > 0) setAllergyToggle(true);
+  }, [open, orderAllergens.length]);
 
   const adjustPickup = (delta) => {
     setPickupMinutes((m) => adjustPickupStepper(m, delta));
@@ -66,26 +80,18 @@ export default function CartDrawer({ open, onClose }) {
     setSubmitting(true);
     setError(null);
 
-    const autoNote = items
-      .map((item) => {
-        const mods = [
-          item.size !== 'Regular' && item.size,
-          !DEFAULT_MILKS.includes(item.milk) && item.milk,
-          item.syrup && `${item.syrup} syrup`,
-          ...(item.alterations ?? []),
-        ]
-          .filter(Boolean)
-          .join(', ');
-        return mods ? `${item.name}: ${mods}` : item.name;
-      })
-      .join(' · ');
-
-    const fullNote = orderNote.trim()
-      ? `${autoNote} | Note: ${orderNote.trim()}`
-      : autoNote;
+    const allergensPayload = allergyToggle ? orderAllergens : [];
 
     const orderSnapshot = {
-      items: items.map((i) => ({ name: i.name, emoji: i.emoji, quantity: i.quantity, size: i.size, milk: i.milk, category: i.category, totalPrice: i.totalPrice })),
+      items: items.map((i) => ({
+        name: i.name,
+        emoji: i.emoji,
+        quantity: i.quantity,
+        size: i.size,
+        milk: i.milk,
+        category: i.category,
+        totalPrice: i.totalPrice,
+      })),
       pickupMinutes,
       total: subtotal,
       placedAt: Date.now(),
@@ -96,7 +102,8 @@ export default function CartDrawer({ open, onClose }) {
         setOrderSuccessVariant('updated');
         const updated = await updateCustomerOrder(authFetch, editOrderId, {
           customer_name: user.displayName,
-          note: fullNote,
+          note: null,
+          allergens: allergensPayload,
           pickup_minutes: pickupMinutes,
           line_items: orderLineItemsFromCartItems(items),
         });
@@ -107,26 +114,35 @@ export default function CartDrawer({ open, onClose }) {
           squareOrderId: updated.square_order_id,
         });
         clearEditMode();
+        clearCart();
+        setAllergyToggle(false);
+        setOrderSuccess(true);
       } else {
         setOrderSuccessVariant('placed');
-        const data = await submitOrder(
-          {
-            cartItems: items,
-            customerName: user.displayName,
-            note: fullNote,
-            pickupMinutes,
-          },
-          authFetch
-        );
-        setActiveOrder({
-          ...orderSnapshot,
-          orderId: data.db_order_id ?? data.order_id,
-          dbOrderId: data.db_order_id,
-          squareOrderId: data.order_id,
-        });
+        const pubKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+        if (!pubKey) {
+          setError('Checkout is not configured (missing VITE_STRIPE_PUBLISHABLE_KEY).');
+        } else {
+          const { sessionId, url } = await createCheckoutSession(authFetch, {
+            line_items: orderLineItemsFromCartItems(items),
+            customer_name: user.displayName,
+            pickup_minutes: pickupMinutes,
+            allergens: allergensPayload,
+          });
+          const stripe = await loadStripe(pubKey);
+          if (!stripe) {
+            throw new Error('Stripe.js failed to load');
+          }
+          const { error: stripeErr } = await stripe.redirectToCheckout({ sessionId });
+          if (stripeErr) {
+            if (url) {
+              window.location.assign(url);
+              return;
+            }
+            throw new Error(stripeErr.message || 'Could not redirect to payment');
+          }
+        }
       }
-      clearCart();
-      setOrderSuccess(true);
     } catch (err) {
       setError(err.message || 'Could not place order. Please try again.');
     } finally {
@@ -146,7 +162,6 @@ export default function CartDrawer({ open, onClose }) {
       });
     }
     onClose();
-    setOrderNote('');
     setPickupMinutes(DEFAULT_PICKUP_MINUTES);
     navigate('/');
   };
@@ -179,7 +194,6 @@ export default function CartDrawer({ open, onClose }) {
               />
             ) : (
               <>
-                {/* Dark green combined header */}
                 <div
                   className="flex-shrink-0"
                   style={{
@@ -188,7 +202,6 @@ export default function CartDrawer({ open, onClose }) {
                     overflow: 'hidden',
                   }}
                 >
-                  {/* Grain */}
                   <div style={{
                     position: 'absolute',
                     inset: 0,
@@ -196,11 +209,9 @@ export default function CartDrawer({ open, onClose }) {
                     backgroundRepeat: 'repeat',
                     pointerEvents: 'none',
                   }} />
-                  {/* Drag handle */}
                   <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 2, position: 'relative' }}>
                     <div style={{ width: 40, height: 4, background: 'rgba(240,230,208,0.3)', borderRadius: 100 }} />
                   </div>
-                  {/* Header row */}
                   <div style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -219,6 +230,7 @@ export default function CartDrawer({ open, onClose }) {
                       {editOrderId != null ? 'Update order' : 'Your order'}
                     </h2>
                     <button
+                      type="button"
                       onClick={onClose}
                       style={{
                         width: 32,
@@ -240,7 +252,6 @@ export default function CartDrawer({ open, onClose }) {
                   </div>
                 </div>
 
-                {/* Items list */}
                 <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0" style={{ padding: '12px 20px' }}>
                   {items.length === 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', textAlign: 'center' }}>
@@ -261,31 +272,55 @@ export default function CartDrawer({ open, onClose }) {
                             borderRadius: 18,
                             padding: '14px 16px',
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: 'flex-start',
                             gap: 12,
                           }}
                         >
-                          <span style={{ fontSize: 30 }}>{item.emoji}</span>
+                          <span style={{ fontSize: 30, flexShrink: 0 }}>{item.emoji}</span>
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{
-                              fontFamily: 'Fraunces, Georgia, serif',
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: '#1a2e1a',
-                              lineHeight: 1.3,
-                              margin: 0,
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                              whiteSpace: 'nowrap',
-                            }}>
-                              {item.name}
-                            </p>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                              <p style={{
+                                fontFamily: 'Fraunces, Georgia, serif',
+                                fontSize: 14,
+                                fontWeight: 700,
+                                color: '#1a2e1a',
+                                lineHeight: 1.3,
+                                margin: 0,
+                                flex: 1,
+                                minWidth: 0,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden',
+                              }}>
+                                {item.name}
+                              </p>
+                              <button
+                                type="button"
+                                aria-label={`Edit ${item.name}`}
+                                onClick={() => onEditLine?.(item)}
+                                style={{
+                                  flexShrink: 0,
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: 10,
+                                  border: '1.5px solid #d4c0a0',
+                                  background: 'rgba(255,255,255,0.6)',
+                                  color: '#1a2e1a',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                }}
+                              >
+                                <PenIcon />
+                              </button>
+                            </div>
                             <p style={{
                               fontFamily: 'Plus Jakarta Sans, sans-serif',
                               fontSize: 11,
                               color: 'rgba(26,46,26,0.45)',
-                              marginTop: 2,
-                              margin: '2px 0 0',
+                              margin: '4px 0 0',
                             }}>
                               {[
                                 item.size !== 'Regular' && item.size,
@@ -294,31 +329,43 @@ export default function CartDrawer({ open, onClose }) {
                                 ...(item.alterations ?? []),
                               ].filter(Boolean).join(', ') || (item.category === 'coffee' ? 'Regular' : null)}
                             </p>
+                            {item.customerNote ? (
+                              <p style={{
+                                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                fontSize: 11,
+                                fontStyle: 'italic',
+                                color: 'rgba(26,46,26,0.55)',
+                                margin: '4px 0 0',
+                              }}>
+                                {item.customerNote}
+                              </p>
+                            ) : null}
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <button type="button" onClick={() => updateQuantity(item.cartId, -1)} style={stepperBtn}>−</button>
+                              <span style={{
+                                fontFamily: 'Fraunces, Georgia, serif',
+                                fontSize: 15,
+                                fontWeight: 700,
+                                color: '#1a2e1a',
+                                width: 18,
+                                textAlign: 'center',
+                              }}>
+                                {item.quantity}
+                              </span>
+                              <button type="button" onClick={() => updateQuantity(item.cartId, 1)} style={stepperBtn}>+</button>
+                            </div>
                             <p style={{
                               fontFamily: 'Plus Jakarta Sans, sans-serif',
                               fontSize: 13,
                               fontWeight: 600,
                               color: '#c8902a',
-                              marginTop: 3,
-                              margin: '3px 0 0',
+                              margin: 0,
                             }}>
                               £{(item.totalPrice / 100).toFixed(2)} ea.
                             </p>
-                          </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                            <button onClick={() => updateQuantity(item.cartId, -1)} style={stepperBtn}>−</button>
-                            <span style={{
-                              fontFamily: 'Fraunces, Georgia, serif',
-                              fontSize: 15,
-                              fontWeight: 700,
-                              color: '#1a2e1a',
-                              width: 18,
-                              textAlign: 'center',
-                            }}>
-                              {item.quantity}
-                            </span>
-                            <button onClick={() => updateQuantity(item.cartId, 1)} style={stepperBtn}>+</button>
                           </div>
                         </motion.div>
                       ))}
@@ -326,7 +373,6 @@ export default function CartDrawer({ open, onClose }) {
                   )}
                 </div>
 
-                {/* Footer */}
                 {items.length > 0 && (
                   <div
                     className="flex-shrink-0"
@@ -398,7 +444,6 @@ export default function CartDrawer({ open, onClose }) {
                       </p>
                     )}
 
-                    {/* Total */}
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                       <span style={{
                         fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -421,7 +466,6 @@ export default function CartDrawer({ open, onClose }) {
                       </span>
                     </div>
 
-                    {/* Pickup row */}
                     <div style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -445,7 +489,6 @@ export default function CartDrawer({ open, onClose }) {
                           fontFamily: 'Plus Jakarta Sans, sans-serif',
                           fontSize: 12,
                           color: 'rgba(26,46,26,0.45)',
-                          marginTop: 2,
                           margin: '2px 0 0',
                         }}>
                           {formatPickupTimeWithAtPrefix(pickupMinutes)}
@@ -453,6 +496,7 @@ export default function CartDrawer({ open, onClose }) {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <button
+                          type="button"
                           onClick={() => adjustPickup(-PICKUP_STEP)}
                           disabled={pickupMinutes === PICKUP_MIN_PICKUP}
                           style={{ ...stepperBtn, opacity: pickupMinutes === PICKUP_MIN_PICKUP ? 0.3 : 1 }}
@@ -468,35 +512,71 @@ export default function CartDrawer({ open, onClose }) {
                           textAlign: 'center',
                         }}>
                           {pickupMinutes === PICKUP_MIN_PICKUP ? 'ASAP' : `${pickupMinutes}m`}
-                          </span>
-                        <button onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>+</button>
+                        </span>
+                        <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>+</button>
                       </div>
                     </div>
 
-                    {/* Note */}
-                    <textarea
-                      value={orderNote}
-                      onChange={(e) => setOrderNote(e.target.value)}
-                      placeholder="Add a note for the barista…"
-                      rows={2}
-                      className="focus:outline-none"
+                    <div
                       style={{
-                        width: '100%',
-                        background: 'rgba(255,255,255,0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        background: 'rgba(255,255,255,0.35)',
                         border: '1.5px solid #e0d0b0',
-                        borderRadius: 14,
+                        borderRadius: 16,
                         padding: '12px 16px',
-                        fontSize: 13,
-                        fontFamily: 'Plus Jakarta Sans, sans-serif',
-                        color: '#1a2e1a',
-                        resize: 'none',
-                        boxSizing: 'border-box',
                       }}
-                    />
+                    >
+                      <span style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: '#1a2e1a',
+                      }}>
+                        Do you have any allergies?
+                      </span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={allergyToggle}
+                        onClick={() => {
+                          setAllergyToggle((v) => !v);
+                          if (allergyToggle) setOrderAllergens([]);
+                        }}
+                        style={{
+                          width: 48,
+                          height: 28,
+                          borderRadius: 999,
+                          border: 'none',
+                          cursor: 'pointer',
+                          background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
+                          position: 'relative',
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span
+                          style={{
+                            position: 'absolute',
+                            top: 3,
+                            left: allergyToggle ? 24 : 3,
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            background: '#f0e6d0',
+                            transition: 'left 0.15s ease',
+                          }}
+                        />
+                      </button>
+                    </div>
 
-                    {/* Place order */}
+                    {allergyToggle && (
+                      <AllergyChipsInput value={orderAllergens} onChange={setOrderAllergens} />
+                    )}
+
                     <motion.button
                       whileTap={{ scale: 0.97 }}
+                      type="button"
                       onClick={handlePlaceOrder}
                       disabled={submitting}
                       style={{

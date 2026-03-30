@@ -8,6 +8,8 @@ export default function ItemDetailSheet({
   item,
   onClose,
   onAddToCart,
+  editCartLine = null,
+  onSaveCartLine,
   milkOptions = MILK_OPTIONS,
   sizeOptions = SIZE_OPTIONS,
   syrupOptions = SYRUP_OPTIONS,
@@ -19,16 +21,28 @@ export default function ItemDetailSheet({
   const [syrup, setSyrup] = useState(null);
   const [alterations, setAlterations] = useState([]);
   const [quantity, setQuantity] = useState(1);
+  const [customerNote, setCustomerNote] = useState('');
+
+  const isEdit = Boolean(editCartLine?.cartId);
 
   useEffect(() => {
-    if (item) {
+    if (!item) return;
+    if (editCartLine) {
+      setSize(editCartLine.size ?? 'Regular');
+      setMilk(editCartLine.milk ?? milkOptions[0]?.name ?? 'Full Fat');
+      setSyrup(editCartLine.syrup ?? null);
+      setAlterations(Array.isArray(editCartLine.alterations) ? [...editCartLine.alterations] : []);
+      setQuantity(editCartLine.quantity ?? 1);
+      setCustomerNote(editCartLine.customerNote != null ? String(editCartLine.customerNote) : '');
+    } else {
       setSize('Regular');
       setMilk(milkOptions[0]?.name ?? 'Full Fat');
       setSyrup(null);
       setAlterations([]);
       setQuantity(1);
+      setCustomerNote('');
     }
-  }, [item?.catalogObjectId]);
+  }, [item?.catalogObjectId, editCartLine?.cartId, milkOptions, editCartLine]);
 
   const toggleAlteration = (name) => {
     setAlterations((prev) => prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]);
@@ -43,6 +57,27 @@ export default function ItemDetailSheet({
 
   const handleAdd = () => {
     if (!item || addDisabled) return;
+    const noteTrim = customerNote.trim();
+    if (isEdit && onSaveCartLine) {
+      onSaveCartLine({
+        cartId: editCartLine.cartId,
+        catalogObjectId: item.catalogObjectId,
+        name: item.name,
+        emoji: item.emoji,
+        category: item.category,
+        showCoffeeOptions: item.showCoffeeOptions,
+        size,
+        milk,
+        syrup,
+        alterations,
+        quantity,
+        totalPrice: unitPrice,
+        customerNote: noteTrim,
+        fromExistingOrder: editCartLine.fromExistingOrder,
+      });
+      onClose();
+      return;
+    }
     const cartId = `${item.catalogObjectId}|${size}|${milk}|${syrup ?? 'none'}|${alterations.join(',')}|${Date.now()}`;
     onAddToCart({
       cartId,
@@ -50,12 +85,14 @@ export default function ItemDetailSheet({
       name: item.name,
       emoji: item.emoji,
       category: item.category,
+      showCoffeeOptions: item.showCoffeeOptions,
       size,
       milk,
       syrup,
       alterations,
       quantity,
       totalPrice: unitPrice,
+      customerNote: noteTrim,
     });
     onClose();
   };
@@ -319,6 +356,30 @@ export default function ItemDetailSheet({
                 </div>
               )}
 
+              {/* Note for this item */}
+              <div style={{ marginBottom: 20 }}>
+                <span style={sectionLabel}>Add a note</span>
+                <textarea
+                  value={customerNote}
+                  onChange={(e) => setCustomerNote(e.target.value)}
+                  placeholder=""
+                  rows={2}
+                  className="focus:outline-none"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    padding: '8px 14px',
+                    borderRadius: 14,
+                    border: '1.5px solid #e0d0b0',
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 13,
+                    resize: 'none',
+                    color: '#1a2e1a',
+                    background: 'rgba(255,255,255,0.5)',
+                  }}
+                />
+              </div>
+
               {/* Quantity */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
                 <span style={sectionLabel}>Quantity</span>
@@ -407,7 +468,7 @@ export default function ItemDetailSheet({
                 }}
               >
                 <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  {addDisabled ? 'Please wait…' : 'Add to order'}
+                  {addDisabled ? 'Please wait…' : isEdit ? 'Save changes' : 'Add to order'}
                 </span>
                 <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
                   £{(totalPrice / 100).toFixed(2)}

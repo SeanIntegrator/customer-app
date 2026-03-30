@@ -194,7 +194,9 @@ export default function Profile() {
 
   const handleLoadUsualToCart = () => {
     if (!usualResult?.items?.length) return;
-    replaceCartLines(apiOrderItemsToCartLines(usualResult.items));
+    replaceCartLines(apiOrderItemsToCartLines(usualResult.items), {
+      allergens: usualResult.allergens ?? [],
+    });
     navigate('/order');
   };
 

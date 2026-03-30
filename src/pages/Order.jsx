@@ -15,9 +15,10 @@ export default function Order() {
   const navigate = useNavigate();
   const { user, loading: authLoading, authFetch } = useAuth();
   const { items: catalogItems, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error } = useCatalog();
-  const { addItem, totalItems, subtotal, editOrderId, loadCartFromOrderEdit, items: cartItems } = useCart();
+  const { addItem, totalItems, subtotal, editOrderId, loadCartFromOrderEdit, items: cartItems, updateCartLine } = useCart();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
+  const [cartEditLine, setCartEditLine] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
   const [cartBounce, setCartBounce] = useState(false);
   const [serverActiveOrderResolved, setServerActiveOrderResolved] = useState(false);
@@ -94,6 +95,22 @@ export default function Order() {
     activeCategory === 'all'
       ? catalogItems
       : catalogItems.filter((i) => i.category === activeCategory);
+
+  const sheetItem = useMemo(() => {
+    if (cartEditLine?.catalogObjectId) {
+      const c = catalogItems.find((x) => x.catalogObjectId === cartEditLine.catalogObjectId);
+      if (c) return c;
+      return {
+        catalogObjectId: cartEditLine.catalogObjectId,
+        name: cartEditLine.name,
+        emoji: cartEditLine.emoji,
+        category: cartEditLine.category,
+        price: cartEditLine.totalPrice,
+        showCoffeeOptions: cartEditLine.showCoffeeOptions ?? false,
+      };
+    }
+    return selectedItem;
+  }, [cartEditLine, selectedItem, catalogItems]);
 
   const counts = categories.reduce((acc, cat) => {
     acc[cat.id] = cat.id === 'all' ? catalogItems.length : catalogItems.filter((i) => i.category === cat.id).length;
@@ -414,17 +431,47 @@ export default function Order() {
       </AnimatePresence>
 
       <ItemDetailSheet
-        item={selectedItem}
-        onClose={() => setSelectedItem(null)}
+        item={sheetItem}
+        editCartLine={cartEditLine}
+        onSaveCartLine={(line) => {
+          updateCartLine(line.cartId, {
+            name: line.name,
+            emoji: line.emoji,
+            category: line.category,
+            showCoffeeOptions: line.showCoffeeOptions,
+            size: line.size,
+            milk: line.milk,
+            syrup: line.syrup,
+            alterations: line.alterations,
+            quantity: line.quantity,
+            totalPrice: line.totalPrice,
+            customerNote: line.customerNote,
+          });
+          setCartEditLine(null);
+          setCartOpen(true);
+        }}
+        onClose={() => {
+          const wasEdit = cartEditLine != null;
+          setCartEditLine(null);
+          setSelectedItem(null);
+          if (wasEdit) setCartOpen(true);
+        }}
         onAddToCart={handleAddToCart}
         milkOptions={milkOptions}
         sizeOptions={sizeOptions}
         syrupOptions={syrupOptions}
         alterationOptions={alterationOptions}
-        addDisabled={addToMenuBlocked}
+        addDisabled={addToMenuBlocked && !cartEditLine}
       />
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        onEditLine={(line) => {
+          setCartEditLine(line);
+          setCartOpen(false);
+        }}
+      />
     </motion.div>
   );
 }
