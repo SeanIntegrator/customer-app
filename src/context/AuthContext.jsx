@@ -3,25 +3,61 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 const AuthContext = createContext(null);
 
 const API_URL = import.meta.env.VITE_API_URL ?? '';
+const TOKEN_KEY = 'auth_token';
+
+function readStoredToken() {
+  try {
+    return sessionStorage.getItem(TOKEN_KEY) || localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistToken(token) {
+  try {
+    sessionStorage.setItem(TOKEN_KEY, token);
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    try {
+      sessionStorage.setItem(TOKEN_KEY, token);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function clearStoredToken() {
+  try {
+    sessionStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    checkSession();
-  }, []);
-
-  async function checkSession() {
+  const checkSession = useCallback(async () => {
     try {
+      const token = readStoredToken();
+      const headers = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
       const res = await fetch(`${API_URL}/api/auth/me`, {
         credentials: 'include',
+        headers,
       });
       if (res.ok) {
         const data = await res.json();
         setUser(data.user ?? null);
       } else {
         setUser(null);
+        if (res.status === 401) {
+          clearStoredToken();
+        }
       }
     } catch (error) {
       console.error('Session check failed:', error);
@@ -29,7 +65,11 @@ export function AuthProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    checkSession();
+  }, [checkSession]);
 
   const handleGoogleCredential = useCallback(async (credentialResponse) => {
     const res = await fetch(`${API_URL}/api/auth/google`, {
@@ -45,7 +85,7 @@ export function AuthProvider({ children }) {
     const data = await res.json();
     setUser(data.user);
     if (data.token) {
-      sessionStorage.setItem('auth_token', data.token);
+      persistToken(data.token);
     }
     return data.user;
   }, []);
@@ -60,11 +100,11 @@ export function AuthProvider({ children }) {
       console.error('Logout error:', error);
     }
     setUser(null);
-    sessionStorage.removeItem('auth_token');
+    clearStoredToken();
   }, []);
 
   const authFetch = useCallback(async (url, options = {}) => {
-    const token = sessionStorage.getItem('auth_token');
+    const token = readStoredToken();
     const headers = { ...options.headers };
     if (token) {
       headers.Authorization = `Bearer ${token}`;

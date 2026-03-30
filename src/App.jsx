@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { CartProvider } from './context/CartContext';
-import GoogleOneTap from './components/GoogleOneTap';
+import GoogleOneTapGate from './components/GoogleOneTapGate';
 import BottomNav from './components/BottomNav';
 import PostOrderFeedbackLayer from './components/PostOrderFeedbackLayer';
 import Home from './pages/Home';
@@ -18,7 +18,7 @@ export default function App() {
 
   return (
     <CartProvider>
-      {HAS_GOOGLE_CLIENT && <GoogleOneTap />}
+      {HAS_GOOGLE_CLIENT && <GoogleOneTapGate />}
       <div className="flex flex-col h-full bg-cream overflow-hidden">
         <div className="flex-1 overflow-hidden relative">
           <AnimatePresence mode="wait">

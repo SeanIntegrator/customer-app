@@ -15,7 +15,7 @@ function pickupMinutesFromOrder(order) {
 export default function OrderPaymentSuccess() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
-  const { authFetch, isAuthenticated } = useAuth();
+  const { authFetch, isAuthenticated, loading: authLoading } = useAuth();
   const { clearCart, setActiveOrder, registerPendingKdsFeedback } = useCart();
   const navigate = useNavigate();
   const [phase, setPhase] = useState('loading');
@@ -27,10 +27,15 @@ export default function OrderPaymentSuccess() {
       setPhase('error');
       return;
     }
+    if (authLoading) {
+      return;
+    }
     if (!isAuthenticated) {
       setPhase('auth');
       return;
     }
+
+    setPhase((p) => (p === 'auth' || p === 'loading' ? 'loading' : p));
 
     let cancelled = false;
     let attempts = 0;
@@ -70,7 +75,7 @@ export default function OrderPaymentSuccess() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, isAuthenticated, authFetch, clearCart, setActiveOrder]);
+  }, [sessionId, isAuthenticated, authLoading, authFetch, clearCart, setActiveOrder]);
 
   const handleDone = () => {
     if (order?.id != null && order?.square_order_id) {
@@ -81,6 +86,15 @@ export default function OrderPaymentSuccess() {
     }
     navigate('/');
   };
+
+  if (authLoading && sessionId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] px-6 text-center gap-3">
+        <div className="w-10 h-10 border-2 border-[#1a2e1a]/20 border-t-[#1a2e1a] rounded-full animate-spin" />
+        <p className="font-serif text-lg text-[#1a2e1a]">Checking your session…</p>
+      </div>
+    );
+  }
 
   if (!sessionId) {
     return (
@@ -141,7 +155,7 @@ export default function OrderPaymentSuccess() {
   }
 
   return (
-    <div className="relative flex-1 min-h-0">
+    <div className="relative w-full min-h-[100dvh] flex-1">
       <OrderSuccess
         variant="placed"
         pickupMinutes={pickupMinutesFromOrder(order)}
