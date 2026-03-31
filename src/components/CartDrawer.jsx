@@ -238,7 +238,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
 
   const handleSuccessDone = () => {
     if (
-      orderSuccessVariant === 'placed' &&
+      (orderSuccessVariant === 'placed' || orderSuccessVariant === 'updated') &&
       activeOrder?.dbOrderId != null &&
       activeOrder?.squareOrderId
     ) {

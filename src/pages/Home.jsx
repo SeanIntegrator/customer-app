@@ -20,6 +20,8 @@ import { getCafeSocket } from '../lib/cafeSocket';
 export default function Home() {
   const navigate = useNavigate();
   const { activeOrder, loadCartFromOrderEdit, startAddingToOrder } = useCart();
+  const activeOrderRef = useRef(activeOrder);
+  activeOrderRef.current = activeOrder;
   const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
@@ -66,14 +68,23 @@ export default function Home() {
     if (!socket) return undefined;
 
     const onKdsCompleted = (payload) => {
-      const cur = serverLiveOrderRef.current;
-      if (!cur) return;
       const db = payload?.dbOrderId;
       const sq = payload?.squareOrderId != null ? String(payload.squareOrderId) : '';
-      const match =
-        (db != null && Number(cur.id) === Number(db)) ||
-        (sq !== '' && String(cur.square_order_id) === sq);
-      if (match) refreshLiveOrderRef.current();
+      const cur = serverLiveOrderRef.current;
+      const ao = activeOrderRef.current;
+
+      const matchServer =
+        cur != null &&
+        ((db != null && Number(cur.id) === Number(db)) ||
+          (sq !== '' && String(cur.square_order_id ?? '') === sq));
+      const aoId = ao?.dbOrderId ?? ao?.orderId;
+      const matchActive =
+        ao != null &&
+        aoId != null &&
+        ((db != null && Number(aoId) === Number(db)) ||
+          (sq !== '' && ao.squareOrderId != null && String(ao.squareOrderId) === sq));
+
+      if (matchServer || matchActive) refreshLiveOrderRef.current();
     };
 
     socket.on('customerOrderCompleted', onKdsCompleted);
@@ -101,10 +112,11 @@ export default function Home() {
     }
     if (activeOrder && (activeOrder.orderId != null || activeOrder.dbOrderId != null)) {
       const id = activeOrder.dbOrderId ?? activeOrder.orderId;
+      const at = Number(activeOrder.total);
       return {
         id,
         status: 'confirmed',
-        total_amount: activeOrder.total,
+        total_amount: Number.isFinite(at) ? at : 0,
         pickupMinutes: activeOrder.pickupMinutes ?? 10,
         items: activeOrder.items || [],
         editable: true,

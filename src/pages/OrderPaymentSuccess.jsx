@@ -12,6 +12,28 @@ function pickupMinutesFromOrder(order) {
   return Math.max(0, Math.round(ms / 60000));
 }
 
+/** Full snapshot for Home gold card + KDS-complete matching (minimal { dbOrderId } breaks after server list clears). */
+function activeOrderSnapshotFromApiOrder(o) {
+  if (!o?.id) return null;
+  const total = Number(o.total_amount);
+  return {
+    dbOrderId: o.id,
+    orderId: o.id,
+    squareOrderId: o.square_order_id,
+    total: Number.isFinite(total) ? total : 0,
+    pickupMinutes: pickupMinutesFromOrder(o),
+    placedAt: Date.now(),
+    items: (o.items || []).map((it) => ({
+      name: it.item_name,
+      emoji: it.item_emoji || '☕',
+      quantity: it.quantity,
+      totalPrice: it.unit_price,
+      size: 'Regular',
+      milk: 'Full Fat',
+    })),
+  };
+}
+
 export default function OrderPaymentSuccess() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
@@ -54,11 +76,7 @@ export default function OrderPaymentSuccess() {
           if (incremental) {
             clearAddingToOrder();
           }
-          setActiveOrder({
-            dbOrderId: o.id,
-            squareOrderId: o.square_order_id,
-            orderId: o.id,
-          });
+          setActiveOrder(activeOrderSnapshotFromApiOrder(o));
         }
       } catch (e) {
         if (cancelled) return;

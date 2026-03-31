@@ -106,9 +106,9 @@ export default function HomeBridgingCta({
                         </span>
                         {mods && <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', display: 'block' }}>{mods}</span>}
                       </div>
-                      {item.totalPrice != null && (
+                      {item.totalPrice != null && Number.isFinite(Number(item.totalPrice)) && (
                         <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, fontWeight: 600, color: '#1a2e1a', flexShrink: 0 }}>
-                          £{((item.totalPrice * item.quantity) / 100).toFixed(2)}
+                          £{((Number(item.totalPrice) * item.quantity) / 100).toFixed(2)}
                         </span>
                       )}
                     </div>
@@ -118,7 +118,13 @@ export default function HomeBridgingCta({
 
               <div style={{ borderTop: '1.5px solid rgba(26,46,26,0.1)', paddingTop: 12, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                 <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>Total</span>
-                <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 22, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>£{(goldCardModel.total_amount / 100).toFixed(2)}</span>
+                <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 22, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>
+                  £{(
+                    Number.isFinite(Number(goldCardModel.total_amount))
+                      ? Number(goldCardModel.total_amount) / 100
+                      : 0
+                  ).toFixed(2)}
+                </span>
               </div>
 
               {goldCardModel.editable &&

@@ -52,8 +52,12 @@ export function CartProvider({ children }) {
 
       setActiveOrder((prev) => {
         if (!prev) return prev;
-        const matchDb = incomingDb != null && Number(prev.dbOrderId) === Number(incomingDb);
-        const matchSq = sq !== '' && String(prev.squareOrderId) === sq;
+        const prevDb = prev.dbOrderId ?? prev.orderId;
+        const matchDb = incomingDb != null && prevDb != null && Number(prevDb) === Number(incomingDb);
+        const matchSq =
+          sq !== '' &&
+          prev.squareOrderId != null &&
+          String(prev.squareOrderId) === sq;
         if (matchDb || matchSq) return null;
         return prev;
       });
