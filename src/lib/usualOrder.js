@@ -1,3 +1,5 @@
+import { getEnrichedCatalog } from './catalogEnrich';
+
 /** Matches orders-db EMOJI_KIND for fingerprinting. */
 const EMOJI_KIND = 'item_emoji';
 
@@ -90,8 +92,17 @@ export function findUsualOrderFromHistory(orders, windowMs = DEFAULT_WINDOW_MS) 
 }
 
 /** Map API order items to cart line shape (new order, not edit mode). */
-export function apiOrderItemsToCartLines(items) {
+export async function apiOrderItemsToCartLines(items) {
   if (!Array.isArray(items)) return [];
+
+  let variationById = {};
+  try {
+    const enriched = await getEnrichedCatalog();
+    variationById = enriched.variationById ?? {};
+  } catch (_) {
+    /* optional */
+  }
+
   return items.map((it, idx) => {
     const alterations = [];
     for (const m of it.modifiers || []) {
@@ -99,18 +110,17 @@ export function apiOrderItemsToCartLines(items) {
         alterations.push(String(m.name));
       }
     }
-    const nm = (it.item_name || '').toLowerCase();
-    const showCoffeeOptions = [
-      'coffee', 'latte', 'tea', 'matcha', 'chai', 'mocha', 'cappuccino', 'americano',
-      'espresso', 'macchiato', 'flat white', 'hot chocolate', 'chocolate', 'drink',
-    ].some((w) => nm.includes(w));
+    const vid = it.square_variation_id;
+    const meta = vid && variationById[vid] ? variationById[vid] : null;
+    const showDrinkModifiers = meta ? meta.showDrinkModifiers : true;
+    const category = meta?.categorySlug ?? 'other';
     return {
       cartId: `usual-${it.id}-${idx}`,
-      catalogObjectId: it.square_variation_id,
+      catalogObjectId: vid,
       name: it.item_name,
       emoji: it.item_emoji || '☕',
-      category: showCoffeeOptions ? 'coffee' : 'food',
-      showCoffeeOptions,
+      category,
+      showDrinkModifiers,
       size: 'Regular',
       milk: 'Full Fat',
       syrup: null,

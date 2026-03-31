@@ -1,8 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS, getSyrupChipColors } from '../data/mock';
+import {
+  CHECKOUT_PRIMARY_GRADIENT,
+  CHECKOUT_PRIMARY_SHADOW,
+  CHECKOUT_PRIMARY_TEXT,
+} from '../lib/checkoutTheme';
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
+
+function isSoyaMilkName(name) {
+  if (!name) return false;
+  const n = name.toLowerCase().trim();
+  if (n.includes('soya') || n.includes('soymilk')) return true;
+  if (n.includes('soy') && n.includes('milk')) return true;
+  return false;
+}
 
 export default function ItemDetailSheet({
   item,
@@ -22,6 +35,12 @@ export default function ItemDetailSheet({
   const [alterations, setAlterations] = useState([]);
   const [quantity, setQuantity] = useState(1);
   const [customerNote, setCustomerNote] = useState('');
+  const [syrupAccordionOpen, setSyrupAccordionOpen] = useState(false);
+
+  const milkOptionsVisible = useMemo(
+    () => milkOptions.filter((m) => !isSoyaMilkName(m.name)),
+    [milkOptions]
+  );
 
   const isEdit = Boolean(editCartLine?.cartId);
   const lockedLineEdit = Boolean(isEdit && editCartLine?.fromExistingOrder);
@@ -30,27 +49,38 @@ export default function ItemDetailSheet({
     if (!item) return;
     if (editCartLine) {
       setSize(editCartLine.size ?? 'Regular');
-      setMilk(editCartLine.milk ?? milkOptions[0]?.name ?? 'Full Fat');
+      const rawMilk = editCartLine.milk ?? milkOptionsVisible[0]?.name ?? 'Full Fat';
+      setMilk(isSoyaMilkName(rawMilk) ? (milkOptionsVisible[0]?.name ?? 'Full Fat') : rawMilk);
       setSyrup(editCartLine.syrup ?? null);
       setAlterations(Array.isArray(editCartLine.alterations) ? [...editCartLine.alterations] : []);
       setQuantity(editCartLine.quantity ?? 1);
       setCustomerNote(editCartLine.customerNote != null ? String(editCartLine.customerNote) : '');
+      setSyrupAccordionOpen(Boolean(editCartLine.syrup));
     } else {
       setSize('Regular');
-      setMilk(milkOptions[0]?.name ?? 'Full Fat');
+      setMilk(milkOptionsVisible[0]?.name ?? 'Full Fat');
       setSyrup(null);
       setAlterations([]);
       setQuantity(1);
       setCustomerNote('');
+      setSyrupAccordionOpen(false);
     }
-  }, [item?.catalogObjectId, editCartLine?.cartId, milkOptions, editCartLine]);
+  }, [item?.catalogObjectId, editCartLine?.cartId, milkOptionsVisible, editCartLine]);
+
+  useEffect(() => {
+    setMilk((prev) =>
+      milkOptionsVisible.some((m) => m.name === prev)
+        ? prev
+        : (milkOptionsVisible[0]?.name ?? 'Full Fat')
+    );
+  }, [milkOptionsVisible]);
 
   const toggleAlteration = (name) => {
     setAlterations((prev) => prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]);
   };
 
   const sizeDelta = sizeOptions.find((s) => s.name === size)?.delta ?? 0;
-  const milkDelta = milkOptions.find((m) => m.name === milk)?.delta ?? 0;
+  const milkDelta = milkOptionsVisible.find((m) => m.name === milk)?.delta ?? milkOptions.find((m) => m.name === milk)?.delta ?? 0;
   const syrupDelta = syrup ? (syrupOptions.find((s) => s.name === syrup)?.delta ?? 0) : 0;
   const alterationsDelta = alterations.reduce((sum, name) => sum + (alterationOptions.find((a) => a.name === name)?.delta ?? 0), 0);
   const unitPrice = item ? (item.price + sizeDelta + milkDelta + syrupDelta + alterationsDelta) : 0;
@@ -70,7 +100,7 @@ export default function ItemDetailSheet({
         name: item.name,
         emoji: item.emoji,
         category: item.category,
-        showCoffeeOptions: item.showCoffeeOptions,
+        showDrinkModifiers: item.showDrinkModifiers,
         size,
         milk,
         syrup,
@@ -90,7 +120,7 @@ export default function ItemDetailSheet({
       name: item.name,
       emoji: item.emoji,
       category: item.category,
-      showCoffeeOptions: item.showCoffeeOptions,
+      showDrinkModifiers: item.showDrinkModifiers,
       size,
       milk,
       syrup,
@@ -102,7 +132,7 @@ export default function ItemDetailSheet({
     onClose();
   };
 
-  const isCoffee = item?.showCoffeeOptions ?? false;
+  const showDrinkUi = item?.showDrinkModifiers ?? item?.showCoffeeOptions ?? false;
 
   const sectionLabel = {
     fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -155,8 +185,7 @@ export default function ItemDetailSheet({
               borderRadius: '28px 28px 0 0',
               zIndex: 50,
               boxShadow: '0 -8px 40px rgba(0,0,0,0.18)',
-              maxHeight: '85vh',
-              overflowY: 'auto',
+              maxHeight: '95vh',
               overflow: 'hidden',
               display: 'flex',
               flexDirection: 'column',
@@ -210,8 +239,25 @@ export default function ItemDetailSheet({
               </div>
             </div>
 
-            {/* Body */}
-            <div style={{ padding: '24px 20px 32px', overflowY: 'auto' }}>
+            <div
+              style={{
+                position: 'relative',
+                flex: 1,
+                minHeight: 0,
+                display: 'flex',
+                flexDirection: 'column',
+              }}
+            >
+              <div
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  overflowY: 'auto',
+                  WebkitOverflowScrolling: 'touch',
+                  padding: '24px 20px',
+                  paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 0px))',
+                }}
+              >
               {lockedLineEdit ? (
                 <p
                   style={{
@@ -234,7 +280,7 @@ export default function ItemDetailSheet({
                 }}
               >
               {/* Size picker */}
-              {isCoffee && (
+              {showDrinkUi && (
                 <div style={{ marginBottom: 20 }}>
                   <span style={sectionLabel}>Size</span>
                   <div style={{ display: 'flex', gap: 8 }}>
@@ -268,11 +314,11 @@ export default function ItemDetailSheet({
               )}
 
               {/* Milk picker */}
-              {isCoffee && (
+              {showDrinkUi && (
                 <div style={{ marginBottom: 20 }}>
                   <span style={sectionLabel}>Milk</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {milkOptions.map((opt) => (
+                    {milkOptionsVisible.map((opt) => (
                       <button
                         key={opt.name}
                         onClick={() => setMilk(opt.name)}
@@ -297,59 +343,111 @@ export default function ItemDetailSheet({
                 </div>
               )}
 
-              {/* Syrup picker */}
-              {isCoffee && syrupOptions.length > 0 && (
+              {/* Syrup picker (accordion; tap selected chip again to clear) */}
+              {showDrinkUi && syrupOptions.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
-                  <span style={sectionLabel}>Syrup</span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    <button
-                      onClick={() => setSyrup(null)}
-                      style={{
-                        padding: '9px 16px',
-                        borderRadius: 100,
-                        fontFamily: 'Plus Jakarta Sans, sans-serif',
-                        fontSize: 13,
-                        fontWeight: 500,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        ...(syrup === null ? activeOption : inactiveOption),
-                      }}
-                    >
-                      None
-                    </button>
-                    {syrupOptions.map((opt) => {
-                      const colors = getSyrupChipColors(opt.name);
-                      const isActive = syrup === opt.name;
-                      return (
-                        <button
-                          key={opt.name}
-                          onClick={() => setSyrup(opt.name)}
-                          style={{
-                            padding: '9px 16px',
-                            borderRadius: 100,
-                            fontFamily: 'Plus Jakarta Sans, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            border: isActive ? 'none' : '1.5px solid #d4c0a0',
-                            background: isActive ? colors.bg : 'rgba(240,230,208,0.6)',
-                            color: isActive ? colors.text : '#6a5a48',
-                          }}
-                        >
-                          {opt.name.replace(/\s*syrup\s*/i, '').trim()}
-                          {opt.delta > 0 && (
-                            <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSyrupAccordionOpen((o) => !o)}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 12,
+                      padding: '10px 4px',
+                      marginBottom: syrupAccordionOpen ? 10 : 0,
+                      background: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    aria-expanded={syrupAccordionOpen}
+                  >
+                    <span style={{ ...sectionLabel, marginBottom: 0 }}>Syrup</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      <span
+                        style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: 'rgba(26,46,26,0.55)',
+                          maxWidth: 160,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {syrup ? syrup.replace(/\s*syrup\s*/i, '').trim() : 'None selected'}
+                      </span>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="rgba(26,46,26,0.45)"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{
+                          transform: syrupAccordionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
+                          flexShrink: 0,
+                        }}
+                        aria-hidden
+                      >
+                        <path d="M6 9l6 6 6-6" />
+                      </svg>
+                    </div>
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {syrupAccordionOpen && (
+                      <motion.div
+                        key="syrup-panel"
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                        style={{ overflow: 'hidden' }}
+                      >
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingBottom: 4 }}>
+                          {syrupOptions.map((opt) => {
+                            const colors = getSyrupChipColors(opt.name);
+                            const isActive = syrup === opt.name;
+                            return (
+                              <button
+                                key={opt.name}
+                                type="button"
+                                onClick={() => setSyrup((cur) => (cur === opt.name ? null : opt.name))}
+                                style={{
+                                  padding: '9px 16px',
+                                  borderRadius: 100,
+                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  fontSize: 13,
+                                  fontWeight: 500,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                  border: isActive ? 'none' : '1.5px solid #d4c0a0',
+                                  background: isActive ? colors.bg : 'rgba(240,230,208,0.6)',
+                                  color: isActive ? colors.text : '#6a5a48',
+                                }}
+                              >
+                                {opt.name.replace(/\s*syrup\s*/i, '').trim()}
+                                {opt.delta > 0 && (
+                                  <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
 
               {/* Alterations */}
-              {isCoffee && alterationOptions.length > 0 && (
+              {showDrinkUi && alterationOptions.length > 0 && (
                 <div style={{ marginBottom: 20 }}>
                   <span style={sectionLabel}>Alterations</span>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
@@ -406,7 +504,7 @@ export default function ItemDetailSheet({
               </div>
 
               {/* Quantity */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <span style={sectionLabel}>Quantity</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <button
@@ -467,45 +565,57 @@ export default function ItemDetailSheet({
                     fontSize: 13,
                     color: 'rgba(26,46,26,0.55)',
                     textAlign: 'center',
-                    marginBottom: 12,
+                    marginBottom: 0,
                   }}
                 >
                   One moment — loading your order…
                 </p>
               )}
               </div>
-              {/* Add to order */}
-              <motion.button
-                whileTap={addDisabled || lockedLineEdit ? {} : { scale: 0.97 }}
-                onClick={lockedLineEdit ? onClose : handleAdd}
-                disabled={addDisabled && !lockedLineEdit}
+              </div>
+
+              <div
                 style={{
-                  width: '100%',
-                  background:
-                    addDisabled && !lockedLineEdit
-                      ? 'rgba(26,46,26,0.12)'
-                      : 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
-                  color: addDisabled && !lockedLineEdit ? 'rgba(26,46,26,0.35)' : '#122012',
-                  borderRadius: 22,
-                  padding: '18px 24px',
-                  border: 'none',
-                  cursor: addDisabled && !lockedLineEdit ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  boxShadow: addDisabled && !lockedLineEdit ? 'none' : '0 4px 20px rgba(200,144,42,0.35)',
-                  marginTop: 8,
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  padding: '12px 20px calc(12px + env(safe-area-inset-bottom, 0px))',
+                  background: '#f0e6d0',
+                  borderTop: '1px solid rgba(26,46,26,0.1)',
+                  boxShadow: '0 -8px 28px rgba(0,0,0,0.08)',
                 }}
               >
-                <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  {lockedLineEdit ? 'Close' : addDisabled ? 'Please wait…' : isEdit ? 'Save changes' : 'Add to order'}
-                </span>
-                {!lockedLineEdit ? (
-                  <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
-                    £{(totalPrice / 100).toFixed(2)}
+                <motion.button
+                  type="button"
+                  whileTap={addDisabled || lockedLineEdit ? {} : { scale: 0.97 }}
+                  onClick={lockedLineEdit ? onClose : handleAdd}
+                  disabled={addDisabled && !lockedLineEdit}
+                  style={{
+                    width: '100%',
+                    background:
+                      addDisabled && !lockedLineEdit ? 'rgba(26,46,26,0.12)' : CHECKOUT_PRIMARY_GRADIENT,
+                    color: addDisabled && !lockedLineEdit ? 'rgba(26,46,26,0.35)' : CHECKOUT_PRIMARY_TEXT,
+                    borderRadius: 22,
+                    padding: '18px 24px',
+                    border: 'none',
+                    cursor: addDisabled && !lockedLineEdit ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    boxShadow: addDisabled && !lockedLineEdit ? 'none' : CHECKOUT_PRIMARY_SHADOW,
+                  }}
+                >
+                  <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                    {lockedLineEdit ? 'Close' : addDisabled ? 'Please wait…' : isEdit ? 'Save changes' : 'Add to order'}
                   </span>
-                ) : null}
-              </motion.button>
+                  {!lockedLineEdit ? (
+                    <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
+                      £{(totalPrice / 100).toFixed(2)}
+                    </span>
+                  ) : null}
+                </motion.button>
+              </div>
             </div>
           </motion.div>
         </>

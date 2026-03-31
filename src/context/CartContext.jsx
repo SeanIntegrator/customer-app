@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getEnrichedCatalog } from '../lib/catalogEnrich';
 
 const CartContext = createContext(null);
 
@@ -27,6 +28,7 @@ export function CartProvider({ children }) {
   const [postCheckoutFeedbackOrderId, setPostCheckoutFeedbackOrderId] = useState(null);
   /** @type {React.MutableRefObject<{ dbOrderId: number, squareOrderId: string }[]>} */
   const pendingKdsFeedbackRef = useRef([]);
+  const [applyReward, setApplyReward] = useState(false);
   const clearActiveOrder = useCallback(() => setActiveOrder(null), []);
   const beginPostCheckoutFeedback = useCallback((orderId) => {
     if (orderId == null || orderId === '') return;
@@ -155,28 +157,38 @@ export function CartProvider({ children }) {
   const clearCart = useCallback(() => {
     setItems([]);
     setOrderAllergens([]);
+    setApplyReward(false);
   }, []);
 
   /** Pre-fill cart from API order shape; opening menu to add more items before PATCH checkout. */
-  const loadCartFromOrderEdit = useCallback((apiOrder) => {
+  const loadCartFromOrderEdit = useCallback(async (apiOrder) => {
     if (!apiOrder?.id) return;
     setAddingToOrderId(null);
+    setApplyReward(false);
     setEditOrderId(apiOrder.id);
     setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
+
+    let variationById = {};
+    try {
+      const enriched = await getEnrichedCatalog();
+      variationById = enriched.variationById ?? {};
+    } catch (_) {
+      /* menu lookup optional */
+    }
+
     setItems(
       (apiOrder.items || []).map((it, idx) => {
-        const nm = (it.item_name || '').toLowerCase();
-        const showCoffeeOptions = [
-          'coffee', 'latte', 'tea', 'matcha', 'chai', 'mocha', 'cappuccino', 'americano',
-          'espresso', 'macchiato', 'flat white', 'hot chocolate', 'chocolate', 'drink',
-        ].some((w) => nm.includes(w));
+        const vid = it.square_variation_id;
+        const meta = vid && variationById[vid] ? variationById[vid] : null;
+        const showDrinkModifiers = meta ? meta.showDrinkModifiers : true;
+        const category = meta?.categorySlug ?? 'other';
         return {
           cartId: `edit-${it.id}-${idx}`,
-          catalogObjectId: it.square_variation_id,
+          catalogObjectId: vid,
           name: it.item_name,
           emoji: it.item_emoji || '☕',
-          category: showCoffeeOptions ? 'coffee' : 'food',
-          showCoffeeOptions,
+          category,
+          showDrinkModifiers,
           size: 'Regular',
           milk: 'Full Fat',
           syrup: null,
@@ -199,6 +211,7 @@ export function CartProvider({ children }) {
     (orderId) => {
       if (orderId == null) return;
       setEditOrderId(null);
+      setApplyReward(false);
       setAddingToOrderId(Number(orderId));
       setItems([]);
       setOrderAllergens([]);
@@ -215,6 +228,7 @@ export function CartProvider({ children }) {
   const replaceCartLines = useCallback((lines, opts = {}) => {
     setEditOrderId(null);
     setAddingToOrderId(null);
+    setApplyReward(false);
     setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
     setItems(Array.isArray(lines) ? lines : []);
   }, []);
@@ -253,6 +267,8 @@ export function CartProvider({ children }) {
         applyKdsOrderCompleted,
         suppressNavBasketForPaidGoldCard,
         setSuppressNavBasketForPaidGoldCard,
+        applyReward,
+        setApplyReward,
       }}
     >
       {children}

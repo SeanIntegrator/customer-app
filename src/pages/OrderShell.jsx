@@ -1,21 +1,38 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation, useNavigate, useBlocker } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useBlocker } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import useCatalog from '../hooks/useCatalog';
 import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
 import { PAPER_GRAIN_BACKGROUND, orderReadyInOneLine } from '../lib/pickup';
-import MenuItem from '../components/MenuItem';
+import {
+  CHECKOUT_PRIMARY_GRADIENT,
+  CHECKOUT_PRIMARY_SHADOW,
+  CHECKOUT_PRIMARY_TEXT,
+} from '../lib/checkoutTheme';
 import ItemDetailSheet from '../components/ItemDetailSheet';
 import CartDrawer from '../components/CartDrawer';
 import Toast from '../components/Toast';
 
-export default function Order() {
+function orderFlowPath(p) {
+  return p === '/order' || p.startsWith('/order/menu/');
+}
+
+export default function OrderShell() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading: authLoading, authFetch } = useAuth();
-  const { items: catalogItems, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error } = useCatalog();
+  const {
+    items: catalogItems,
+    menuCategories,
+    milkOptions,
+    sizeOptions,
+    syrupOptions,
+    alterationOptions,
+    loading,
+    error,
+  } = useCatalog();
   const {
     addItem,
     totalItems,
@@ -29,7 +46,6 @@ export default function Order() {
     clearEditMode,
     clearAddingToOrder,
   } = useCart();
-  const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [cartEditLine, setCartEditLine] = useState(null);
   const [cartOpen, setCartOpen] = useState(false);
@@ -47,11 +63,10 @@ export default function Order() {
   );
 
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    return (
-      basketDirty &&
-      currentLocation.pathname === '/order' &&
-      nextLocation.pathname !== currentLocation.pathname
-    );
+    if (!basketDirty) return false;
+    const cur = currentLocation.pathname;
+    const next = nextLocation.pathname;
+    return orderFlowPath(cur) && !orderFlowPath(next);
   });
 
   const hasAuthToken =
@@ -97,7 +112,7 @@ export default function Order() {
           if (cancelled) return;
           if (list[0]) {
             setInProgressPickupIso(list[0].pickup_time ?? null);
-            loadCartFromOrderEdit(list[0]);
+            await loadCartFromOrderEdit(list[0]);
           } else {
             setInProgressPickupIso(null);
           }
@@ -124,11 +139,6 @@ export default function Order() {
     }
   }, [location.state?.openCart]);
 
-  const filtered =
-    activeCategory === 'all'
-      ? catalogItems
-      : catalogItems.filter((i) => i.category === activeCategory);
-
   const sheetItem = useMemo(() => {
     if (cartEditLine?.catalogObjectId) {
       const c = catalogItems.find((x) => x.catalogObjectId === cartEditLine.catalogObjectId);
@@ -139,16 +149,11 @@ export default function Order() {
         emoji: cartEditLine.emoji,
         category: cartEditLine.category,
         price: cartEditLine.totalPrice,
-        showCoffeeOptions: cartEditLine.showCoffeeOptions ?? false,
+        showDrinkModifiers: cartEditLine.showDrinkModifiers ?? cartEditLine.showCoffeeOptions ?? false,
       };
     }
     return selectedItem;
   }, [cartEditLine, selectedItem, catalogItems]);
-
-  const counts = categories.reduce((acc, cat) => {
-    acc[cat.id] = cat.id === 'all' ? catalogItems.length : catalogItems.filter((i) => i.category === cat.id).length;
-    return acc;
-  }, {});
 
   const handleAddToCart = (item) => {
     addItem(item);
@@ -167,10 +172,40 @@ export default function Order() {
 
   const showInProgressBanner = editOrderId != null || addingToOrderId != null;
 
-  /** Always go home — browser history can include /order/cancelled or Stripe return URLs behind /order. */
   const goBack = () => {
-    navigate('/');
+    if (location.pathname.startsWith('/order/menu/')) {
+      navigate('/order');
+    } else {
+      navigate('/');
+    }
   };
+
+  const outletContext = useMemo(
+    () => ({
+      catalogItems,
+      menuCategories,
+      loading,
+      error,
+      navigate,
+      setSelectedItem,
+      addToMenuBlocked,
+      qtyByCatalogId,
+      editOrderId,
+      addingToOrderId,
+    }),
+    [
+      catalogItems,
+      menuCategories,
+      loading,
+      error,
+      navigate,
+      setSelectedItem,
+      addToMenuBlocked,
+      qtyByCatalogId,
+      editOrderId,
+      addingToOrderId,
+    ]
+  );
 
   return (
     <motion.div
@@ -185,7 +220,6 @@ export default function Order() {
         className="flex-1 min-h-0 overflow-y-auto scrollbar-hide"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {/* Scrolls away with content — compact green header */}
         <div
           style={{
             background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
@@ -297,9 +331,9 @@ export default function Order() {
                 fontFamily: 'Plus Jakarta Sans, sans-serif',
                 fontSize: 12,
                 fontWeight: 700,
-                color: '#f0e6d0',
-                background: '#1a2e1a',
-                border: 'none',
+                color: '#1a2e1a',
+                background: 'rgba(26,46,26,0.1)',
+                border: '1.5px solid rgba(26,46,26,0.28)',
                 borderRadius: 100,
                 padding: '8px 14px',
                 cursor: 'pointer',
@@ -310,97 +344,7 @@ export default function Order() {
           </div>
         )}
 
-        <div
-          className="flex gap-2 overflow-x-auto scrollbar-hide"
-          style={{ padding: '10px 16px', background: '#f0e6d0' }}
-        >
-          {categories.filter((c) => counts[c.id] > 0 || c.id === 'all').map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              style={{
-                flexShrink: 0,
-                padding: '7px 16px',
-                borderRadius: 100,
-                fontSize: 12,
-                fontFamily: 'Plus Jakarta Sans, sans-serif',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.18s ease',
-                border: 'none',
-                ...(activeCategory === cat.id
-                  ? {
-                      background: '#1a2e1a',
-                      color: '#f0e6d0',
-                    }
-                  : {
-                      background: 'rgba(240,230,208,0.6)',
-                      border: '1.5px solid #d4c0a0',
-                      color: '#6a5a48',
-                    }),
-              }}
-            >
-              {cat.label}
-              {counts[cat.id] > 0 && (
-                <span style={{ marginLeft: 5, fontSize: 10, opacity: 0.6 }}>{counts[cat.id]}</span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="scrollbar-hide" style={{ padding: '0 16px 96px' }}>
-          {loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', gap: 12 }}>
-              <svg className="w-8 h-8 animate-spin" viewBox="0 0 24 24" fill="none" style={{ color: '#6a5a48', width: 32, height: 32 }}>
-                <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-              </svg>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#6a5a48' }}>Loading menu…</p>
-            </div>
-          )}
-
-          {error && !loading && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}>
-              <span style={{ fontSize: 48, marginBottom: 12 }}>😔</span>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 700, color: '#1a2e1a', marginBottom: 4 }}>Couldn&apos;t load the menu</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#6a5a48' }}>Make sure the server is running</p>
-            </div>
-          )}
-
-          {!loading && !error && filtered.length === 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}>
-              <span style={{ fontSize: 48, marginBottom: 12 }}>🫙</span>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 700, color: '#1a2e1a' }}>Nothing here yet</p>
-            </div>
-          )}
-
-          {!loading && filtered.length > 0 && (
-            <motion.div layout style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 4 }}>
-              <AnimatePresence mode="popLayout">
-                {filtered.map((item, i) => (
-                  <motion.div
-                    key={item.catalogObjectId}
-                    layout
-                    initial={{ opacity: 0, scale: 0.92 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.92 }}
-                    transition={{ delay: i * 0.03, type: 'spring', stiffness: 400, damping: 30 }}
-                  >
-                    <MenuItem
-                      item={item}
-                      onTap={setSelectedItem}
-                      disabled={addToMenuBlocked}
-                      basketQty={qtyByCatalogId.get(item.catalogObjectId)?.basket ?? 0}
-                      orderedQty={qtyByCatalogId.get(item.catalogObjectId)?.ordered ?? 0}
-                      orderEditMode={editOrderId != null || addingToOrderId != null}
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </motion.div>
-          )}
-        </div>
+        <Outlet context={outletContext} />
       </div>
 
       <AnimatePresence>
@@ -426,8 +370,8 @@ export default function Order() {
               onClick={() => setCartOpen(true)}
               style={{
                 width: '100%',
-                background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
-                color: '#122012',
+                background: CHECKOUT_PRIMARY_GRADIENT,
+                color: CHECKOUT_PRIMARY_TEXT,
                 borderRadius: 22,
                 padding: '16px 20px',
                 display: 'flex',
@@ -435,7 +379,7 @@ export default function Order() {
                 justifyContent: 'space-between',
                 border: 'none',
                 cursor: 'pointer',
-                boxShadow: cartBounce ? '0 4px 24px rgba(200,144,42,0.5)' : '0 4px 20px rgba(200,144,42,0.38)',
+                boxShadow: cartBounce ? '0 4px 24px rgba(200,144,42,0.5)' : CHECKOUT_PRIMARY_SHADOW,
                 fontFamily: 'Fraunces, Georgia, serif',
               }}
             >
@@ -477,7 +421,7 @@ export default function Order() {
             name: line.name,
             emoji: line.emoji,
             category: line.category,
-            showCoffeeOptions: line.showCoffeeOptions,
+            showDrinkModifiers: line.showDrinkModifiers,
             size: line.size,
             milk: line.milk,
             syrup: line.syrup,
@@ -569,12 +513,13 @@ export default function Order() {
                     padding: '14px 18px',
                     borderRadius: 16,
                     border: 'none',
-                    background: '#1a2e1a',
-                    color: '#f0e6d0',
+                    background: CHECKOUT_PRIMARY_GRADIENT,
+                    color: CHECKOUT_PRIMARY_TEXT,
                     fontFamily: 'Fraunces, Georgia, serif',
                     fontSize: 17,
                     fontWeight: 800,
                     cursor: 'pointer',
+                    boxShadow: CHECKOUT_PRIMARY_SHADOW,
                   }}
                 >
                   Stay

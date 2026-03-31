@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DEMO_LOYALTY, EVENTS, PAST_EVENTS } from '../data/mock';
+import { EVENTS, PAST_EVENTS } from '../data/mock';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useLoyalty } from '../context/LoyaltyContext';
 import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
 import { fetchCustomerOrders } from '../lib/api';
 import { findUsualOrderFromHistory, apiOrderItemsToCartLines } from '../lib/usualOrder';
@@ -138,37 +139,50 @@ function orderSummaryLine(order) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { activeOrder, clearActiveOrder, replaceCartLines } = useCart();
+  const { activeOrder, clearActiveOrder, replaceCartLines, editOrderId, addingToOrderId } = useCart();
   const { user, isAuthenticated, logout, loading, authFetch } = useAuth();
+  const {
+    stampsCount,
+    stampsGoal,
+    stampsToNextReward,
+    rewardsAvailable,
+    loading: loyaltyLoading,
+    error: loyaltyError,
+  } = useLoyalty();
   const [expandedOrder, setExpandedOrder] = useState(null);
   const [ratings, setRatings] = useState({});
   const [events, setEvents] = useState(EVENTS);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [ordersForUsual, setOrdersForUsual] = useState([]);
+  const [livePendingOrder, setLivePendingOrder] = useState(null);
 
   useEffect(() => {
     if (!isAuthenticated) {
       setCompletedOrders([]);
       setOrdersForUsual([]);
+      setLivePendingOrder(null);
       return;
     }
     let cancelled = false;
     (async () => {
       setOrdersLoading(true);
       try {
-        const [completed, forUsual] = await Promise.all([
+        const [completed, forUsual, liveList] = await Promise.all([
           fetchCustomerOrders(authFetch, { status: 'completed' }),
           fetchCustomerOrders(authFetch, { status: 'completed', days: 60 }),
+          fetchCustomerOrders(authFetch, { status: 'pending,confirmed' }),
         ]);
         if (!cancelled) {
           setCompletedOrders(completed);
           setOrdersForUsual(forUsual);
+          setLivePendingOrder(liveList[0] ?? null);
         }
       } catch {
         if (!cancelled) {
           setCompletedOrders([]);
           setOrdersForUsual([]);
+          setLivePendingOrder(null);
         }
       } finally {
         if (!cancelled) setOrdersLoading(false);
@@ -181,6 +195,10 @@ export default function Profile() {
 
   const usualResult = useMemo(() => findUsualOrderFromHistory(ordersForUsual), [ordersForUsual]);
 
+  /** Server pending/confirmed, or cart tied to an in-flight order (avoid stale activeOrder after pickup). */
+  const hasExistingOrderInProgress =
+    livePendingOrder != null || editOrderId != null || addingToOrderId != null;
+
   const upcomingEvents = events.filter((e) => e.registered);
   const displayName = user?.displayName ?? 'Guest';
   const profileInitials = user ? initialsFromName(user.displayName) : 'G';
@@ -192,12 +210,13 @@ export default function Profile() {
   const handleRate = (id, stars) => setRatings((r) => ({ ...r, [id]: stars }));
   const toggleEvent = (id) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
 
-  const handleLoadUsualToCart = () => {
-    if (!usualResult?.items?.length) return;
-    replaceCartLines(apiOrderItemsToCartLines(usualResult.items), {
+  const handleLoadUsualToCart = async () => {
+    if (hasExistingOrderInProgress || !usualResult?.items?.length) return;
+    const lines = await apiOrderItemsToCartLines(usualResult.items);
+    replaceCartLines(lines, {
       allergens: usualResult.allergens ?? [],
     });
-    navigate('/order');
+    navigate('/order', { state: { openCart: true } });
   };
 
   return (
@@ -323,7 +342,10 @@ export default function Profile() {
           >
             {[
               { label: 'Orders', value: isAuthenticated ? String(orderCount) : '—' },
-              { label: 'Stamps', value: `${DEMO_LOYALTY.stamps}/${DEMO_LOYALTY.stampsGoal}` },
+              {
+                label: 'Stamps',
+                value: isAuthenticated ? (loyaltyLoading ? '…' : `${stampsCount}/${stampsGoal}`) : '—',
+              },
               { label: 'Events', value: String(eventsEngagementCount) },
             ].map(({ label, value }) => (
               <div key={label} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 100, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -474,9 +496,10 @@ export default function Profile() {
                       <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#c8902a', flexShrink: 0 }} />
                       <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#1a2e1a', flex: 1 }}>
                         {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.name}
-                        {item.category === 'coffee' && (
+                        {(item.showDrinkModifiers ?? item.showCoffeeOptions) !== false &&
+                          [item.size !== 'Regular' && item.size, item.milk && !['Full Fat', 'Regular'].includes(item.milk) && item.milk].filter(Boolean).length > 0 && (
                           <span style={{ color: 'rgba(26,46,26,0.45)', fontSize: 11 }}>
-                            {[item.size !== 'Regular' && item.size, !['Full Fat', 'Regular'].includes(item.milk) && item.milk].filter(Boolean).map(m => ` · ${m}`)}
+                            {[item.size !== 'Regular' && item.size, item.milk && !['Full Fat', 'Regular'].includes(item.milk) && item.milk].filter(Boolean).map((m) => ` · ${m}`)}
                           </span>
                         )}
                       </p>
@@ -523,8 +546,8 @@ export default function Profile() {
                 {/* Left: stamps + progress */}
                 <div style={{ flex: 1 }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6, marginBottom: 12 }}>
-                    {Array.from({ length: DEMO_LOYALTY.stampsGoal }).map((_, i) => {
-                      const filled = i < DEMO_LOYALTY.stamps;
+                    {Array.from({ length: stampsGoal }).map((_, i) => {
+                      const filled = isAuthenticated && !loyaltyLoading && i < stampsCount;
                       return (
                         <motion.div
                           key={i}
@@ -540,14 +563,47 @@ export default function Profile() {
                   </div>
 
                   <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
-                    {DEMO_LOYALTY.stamps} of {DEMO_LOYALTY.stampsGoal} stamps collected
+                    {loyaltyLoading
+                      ? 'Loading…'
+                      : !isAuthenticated
+                        ? `0 of ${stampsGoal} stamps collected`
+                        : `${stampsCount} of ${stampsGoal} stamps collected`}
                   </p>
                   <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.5)' }}>
-                    {DEMO_LOYALTY.stampsGoal - DEMO_LOYALTY.stamps} until your free coffee ☕
+                    {!isAuthenticated
+                      ? 'Sign in to earn stamps on qualifying orders (£3+)'
+                      : loyaltyLoading
+                        ? '…'
+                        : `${stampsToNextReward} until your free coffee ☕`}
                   </p>
+                  {loyaltyError ? (
+                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: '#b34a2a', marginTop: 8 }}>{loyaltyError}</p>
+                  ) : null}
                   <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.35)', marginTop: 8, fontStyle: 'italic' }}>
-                    Earn a stamp with every coffee purchase
+                    Earn stamps when you collect a £3+ order (double on Tuesdays)
                   </p>
+                  {isAuthenticated && !loyaltyLoading && rewardsAvailable > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/rewards')}
+                      style={{
+                        marginTop: 14,
+                        width: '100%',
+                        textAlign: 'center',
+                        fontFamily: 'Fraunces, Georgia, serif',
+                        fontSize: 15,
+                        fontWeight: 800,
+                        color: '#1a2e1a',
+                        background: 'rgba(200,144,42,0.15)',
+                        border: '1.5px solid rgba(200,144,42,0.35)',
+                        borderRadius: 14,
+                        padding: '12px 14px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {rewardsAvailable} reward{rewardsAvailable === 1 ? '' : 's'} ready — view, use at checkout
+                    </button>
+                  ) : null}
                 </div>
 
                 {/* Right: QR code */}
@@ -625,23 +681,26 @@ export default function Profile() {
               </div>
               <motion.button
                 type="button"
-                whileTap={{ scale: 0.98 }}
+                whileTap={hasExistingOrderInProgress ? undefined : { scale: 0.98 }}
+                disabled={hasExistingOrderInProgress}
                 onClick={handleLoadUsualToCart}
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
-                  color: '#122012',
-                  border: 'none',
+                  background: hasExistingOrderInProgress
+                    ? 'rgba(26,46,26,0.08)'
+                    : 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                  color: hasExistingOrderInProgress ? 'rgba(26,46,26,0.45)' : '#122012',
+                  border: hasExistingOrderInProgress ? '1.5px solid rgba(26,46,26,0.12)' : 'none',
                   borderRadius: 16,
                   padding: '14px 18px',
                   fontFamily: 'Fraunces, Georgia, serif',
                   fontSize: 16,
                   fontWeight: 800,
-                  cursor: 'pointer',
-                  boxShadow: '0 4px 18px rgba(200,144,42,0.35)',
+                  cursor: hasExistingOrderInProgress ? 'not-allowed' : 'pointer',
+                  boxShadow: hasExistingOrderInProgress ? 'none' : '0 4px 18px rgba(200,144,42,0.35)',
                 }}
               >
-                Replace basket with this order
+                {hasExistingOrderInProgress ? 'Order already in progress' : 'Quick order my usual'}
               </motion.button>
             </div>
           )}

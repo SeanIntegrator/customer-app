@@ -1,22 +1,7 @@
 import { useState, useEffect } from 'react';
-import { fetchCatalogItems, fetchModifierCategories } from '../lib/api';
-import { getPriceForItem, getEmojiForItem, MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from '../data/mock';
-
-// Convert a Square category name to a stable URL-safe slug for filtering
-function slugify(name) {
-  if (!name) return 'other';
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-}
-
-// Espresso-based drinks get milk/syrup/alteration pickers.
-// Check the Square CATEGORY name, not the item name, to avoid
-// misclassifying "Matcha Latte" (latte → coffee) or missing "Long Black".
-function isCoffeeCategory(squareCategoryName) {
-  if (!squareCategoryName) return false;
-  const n = squareCategoryName.toLowerCase();
-  if (['retail', 'tea', 'matcha', 'chai', 'cold', 'food', 'pastry', 'pastries'].some((w) => n.includes(w))) return false;
-  return ['coffee', 'espresso', 'hot drink', 'latte'].some((w) => n.includes(w));
-}
+import { fetchModifierCategories } from '../lib/api';
+import { getEnrichedCatalog } from '../lib/catalogEnrich';
+import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from '../data/mock';
 
 function parseMilkOptions(categories) {
   const milkCat = categories.find((c) => c.name?.toLowerCase().includes('milk'));
@@ -65,7 +50,7 @@ function parseSizeOptions(categories) {
 
 export default function useCatalog() {
   const [items, setItems] = useState([]);
-  const [categories, setCategories] = useState([{ id: 'all', label: 'All' }]);
+  const [menuCategories, setMenuCategories] = useState([]);
   const [milkOptions, setMilkOptions] = useState(MILK_OPTIONS);
   const [sizeOptions, setSizeOptions] = useState(SIZE_OPTIONS);
   const [syrupOptions, setSyrupOptions] = useState(SYRUP_OPTIONS);
@@ -77,37 +62,12 @@ export default function useCatalog() {
     let cancelled = false;
     setLoading(true);
 
-    Promise.all([fetchCatalogItems(), fetchModifierCategories()])
-      .then(([raw, modifierCategories]) => {
+    Promise.all([getEnrichedCatalog(), fetchModifierCategories()])
+      .then(([enriched, modifierCategories]) => {
         if (cancelled) return;
-
-        const enriched = raw.map((item) => {
-          const squareCategoryName = item.categoryName?.trim() ?? null;
-          return {
-            catalogObjectId: item.id,
-            name: item.name,
-            price: getPriceForItem(item.name, item.price),
-            emoji: getEmojiForItem(item.name),
-            squareCategoryName,
-            category: slugify(squareCategoryName),
-            showCoffeeOptions: isCoffeeCategory(squareCategoryName),
-          };
-        });
-
-        setItems(enriched);
+        setItems(enriched.items);
+        setMenuCategories(enriched.menuCategories);
         setError(null);
-
-        // Build dynamic category tabs from the unique Square category names,
-        // preserving their natural order of first appearance in the catalog.
-        const seen = new Set();
-        const dynamicCategories = [{ id: 'all', label: 'All' }];
-        for (const item of enriched) {
-          if (item.squareCategoryName && !seen.has(item.category)) {
-            seen.add(item.category);
-            dynamicCategories.push({ id: item.category, label: item.squareCategoryName });
-          }
-        }
-        setCategories(dynamicCategories);
 
         const fromApiMilk = parseMilkOptions(modifierCategories);
         if (fromApiMilk) setMilkOptions(fromApiMilk);
@@ -123,12 +83,24 @@ export default function useCatalog() {
         console.warn('Catalog load failed, using empty menu:', err.message);
         setError(err.message);
         setItems([]);
+        setMenuCategories([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  return { items, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error };
+  return {
+    items,
+    menuCategories,
+    milkOptions,
+    sizeOptions,
+    syrupOptions,
+    alterationOptions,
+    loading,
+    error,
+  };
 }

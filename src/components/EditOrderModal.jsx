@@ -12,6 +12,11 @@ import {
   formatPickupTimeShort,
   pickupIsoToStepperMinutes,
 } from '../lib/pickup';
+import {
+  CHECKOUT_PRIMARY_GRADIENT,
+  CHECKOUT_PRIMARY_SHADOW,
+  CHECKOUT_PRIMARY_TEXT,
+} from '../lib/checkoutTheme';
 
 const stepperBtn = checkoutStepperButtonStyle;
 
@@ -696,8 +701,8 @@ export default function EditOrderModal({
                         onClick={() => onAddMoreItems?.()}
                         style={{
                           width: '100%',
-                          background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
-                          color: '#122012',
+                          background: CHECKOUT_PRIMARY_GRADIENT,
+                          color: CHECKOUT_PRIMARY_TEXT,
                           borderRadius: 20,
                           padding: '16px 20px',
                           border: 'none',
@@ -706,7 +711,7 @@ export default function EditOrderModal({
                           fontWeight: 800,
                           cursor: 'pointer',
                           marginBottom: isPaidViaStripe ? 0 : 12,
-                          boxShadow: '0 4px 20px rgba(200,144,42,0.35)',
+                          boxShadow: CHECKOUT_PRIMARY_SHADOW,
                         }}
                       >
                         Add more items →
@@ -720,8 +725,8 @@ export default function EditOrderModal({
                           disabled={saving || lines.length === 0}
                           style={{
                             width: '100%',
-                            background: '#1a2e1a',
-                            color: '#f0e6d0',
+                            background: CHECKOUT_PRIMARY_GRADIENT,
+                            color: CHECKOUT_PRIMARY_TEXT,
                             borderRadius: 20,
                             padding: '16px 20px',
                             border: 'none',
@@ -730,6 +735,7 @@ export default function EditOrderModal({
                             fontWeight: 800,
                             cursor: saving || lines.length === 0 ? 'not-allowed' : 'pointer',
                             opacity: saving || lines.length === 0 ? 0.55 : 1,
+                            boxShadow: CHECKOUT_PRIMARY_SHADOW,
                           }}
                         >
                           {saving ? 'Saving…' : 'Save changes'}

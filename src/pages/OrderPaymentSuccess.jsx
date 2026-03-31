@@ -2,9 +2,15 @@ import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useLoyalty } from '../context/LoyaltyContext';
 import { fetchOrderByCheckoutSession } from '../lib/api';
 import OrderSuccess from '../components/OrderSuccess';
 import SignInButton from '../components/SignInButton';
+import {
+  CHECKOUT_PRIMARY_GRADIENT,
+  CHECKOUT_PRIMARY_SHADOW,
+  CHECKOUT_PRIMARY_TEXT,
+} from '../lib/checkoutTheme';
 
 function pickupMinutesFromOrder(order) {
   if (!order?.pickup_time) return 15;
@@ -40,6 +46,7 @@ export default function OrderPaymentSuccess() {
   const incremental = searchParams.get('incremental') === '1';
   const { authFetch, isAuthenticated, loading: authLoading } = useAuth();
   const { clearCart, setActiveOrder, registerPendingKdsFeedback, clearAddingToOrder } = useCart();
+  const { refreshAfterOrder } = useLoyalty();
   const navigate = useNavigate();
   const [phase, setPhase] = useState('loading');
   const [order, setOrder] = useState(null);
@@ -99,6 +106,12 @@ export default function OrderPaymentSuccess() {
     };
   }, [sessionId, incremental, isAuthenticated, authLoading, authFetch, clearCart, clearAddingToOrder, setActiveOrder]);
 
+  useEffect(() => {
+    if (phase === 'ready' && order?.id) {
+      refreshAfterOrder();
+    }
+  }, [phase, order?.id, refreshAfterOrder]);
+
   const handleDone = () => {
     if (order?.id != null && order?.square_order_id) {
       registerPendingKdsFeedback({
@@ -125,7 +138,12 @@ export default function OrderPaymentSuccess() {
         <button
           type="button"
           onClick={() => navigate('/order')}
-          className="rounded-2xl bg-[#1a2e1a] text-[#f0e6d0] px-6 py-3 font-bold"
+          className="rounded-2xl px-6 py-3 font-bold border-none cursor-pointer"
+          style={{
+            background: CHECKOUT_PRIMARY_GRADIENT,
+            color: CHECKOUT_PRIMARY_TEXT,
+            boxShadow: CHECKOUT_PRIMARY_SHADOW,
+          }}
         >
           Back to menu
         </button>
@@ -165,7 +183,12 @@ export default function OrderPaymentSuccess() {
         <button
           type="button"
           onClick={() => navigate('/profile')}
-          className="rounded-2xl bg-[#1a2e1a] text-[#f0e6d0] px-6 py-3 font-bold"
+          className="rounded-2xl px-6 py-3 font-bold border-none cursor-pointer"
+          style={{
+            background: CHECKOUT_PRIMARY_GRADIENT,
+            color: CHECKOUT_PRIMARY_TEXT,
+            boxShadow: CHECKOUT_PRIMARY_SHADOW,
+          }}
         >
           Order history
         </button>

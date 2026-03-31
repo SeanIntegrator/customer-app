@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useLoyalty } from '../context/LoyaltyContext';
+import {
+  cartHasEligibleDrinkForReward,
+  computeRewardDiscountPenceForCart,
+} from '../lib/loyaltyDiscount';
 import { loadStripe } from '@stripe/stripe-js';
 import {
   createCheckoutSession,
@@ -13,7 +18,6 @@ import {
 } from '../lib/api';
 import OrderSuccess from './OrderSuccess';
 import SignInButton from './SignInButton';
-import AllergyChipsInput from './AllergyChipsInput';
 import {
   PAPER_GRAIN_BACKGROUND,
   PICKUP_MIN_PICKUP,
@@ -23,6 +27,11 @@ import {
   checkoutStepperButtonStyle,
   formatPickupTimeWithAtPrefix,
 } from '../lib/pickup';
+import {
+  CHECKOUT_PRIMARY_GRADIENT,
+  CHECKOUT_PRIMARY_SHADOW,
+  CHECKOUT_PRIMARY_TEXT,
+} from '../lib/checkoutTheme';
 
 const stepperBtn = checkoutStepperButtonStyle;
 
@@ -33,7 +42,8 @@ function lineMetaCaption(item) {
       !['Full Fat', 'Regular'].includes(item.milk) && item.milk,
       item.syrup,
       ...(item.alterations ?? []),
-    ].filter(Boolean).join(', ') || (item.category === 'coffee' ? 'Regular' : null)
+    ].filter(Boolean).join(', ') ||
+    ((item.showDrinkModifiers ?? item.showCoffeeOptions) ? 'Regular' : null)
   );
 }
 
@@ -67,19 +77,19 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     editOrderId,
     clearEditMode,
     registerPendingKdsFeedback,
-    orderAllergens,
-    setOrderAllergens,
     addingToOrderId,
     clearAddingToOrder,
+    applyReward,
+    setApplyReward,
   } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
+  const { rewardsAvailable } = useLoyalty();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderSuccessVariant, setOrderSuccessVariant] = useState('placed');
   const [pickupMinutes, setPickupMinutes] = useState(DEFAULT_PICKUP_MINUTES);
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
-  const [allergyToggle, setAllergyToggle] = useState(false);
   const [lockedOrder, setLockedOrder] = useState(null);
 
   useEffect(() => {
@@ -112,10 +122,6 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     }
   }, [open]);
 
-  useEffect(() => {
-    if (open && orderAllergens.length > 0) setAllergyToggle(true);
-  }, [open, orderAllergens.length]);
-
   const isUpdateEditMode = editOrderId != null && addingToOrderId == null;
   const tallSheet = !orderSuccess && (editOrderId != null || addingToOrderId != null);
   const existingItems = useMemo(() => items.filter((i) => i.fromExistingOrder), [items]);
@@ -125,6 +131,36 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     [existingItems]
   );
   const newSubtotal = useMemo(() => newItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0), [newItems]);
+
+  const isFreshStripeCheckout = addingToOrderId == null && editOrderId == null;
+  const eligibleForReward =
+    isFreshStripeCheckout &&
+    isAuthenticated &&
+    rewardsAvailable > 0 &&
+    cartHasEligibleDrinkForReward(items);
+
+  useEffect(() => {
+    if (!eligibleForReward) setApplyReward(false);
+  }, [eligibleForReward, setApplyReward]);
+
+  const rewardDiscountPence = useMemo(
+    () => (applyReward && eligibleForReward ? computeRewardDiscountPenceForCart(items) : 0),
+    [applyReward, eligibleForReward, items]
+  );
+
+  /** Matches cafe-orders default STRIPE_MIN_AMOUNT_PENCE */
+  const STRIPE_MIN_CHECKOUT_PENCE = 30;
+  const displayTotalPence = useMemo(() => {
+    if (isFreshStripeCheckout && applyReward && rewardDiscountPence > 0) {
+      return Math.max(0, subtotal - rewardDiscountPence);
+    }
+    return subtotal;
+  }, [isFreshStripeCheckout, applyReward, rewardDiscountPence, subtotal]);
+
+  const rewardBelowStripeMin =
+    Boolean(applyReward && eligibleForReward && rewardDiscountPence > 0) &&
+    displayTotalPence > 0 &&
+    displayTotalPence < STRIPE_MIN_CHECKOUT_PENCE;
 
   const handleSheetClose = () => {
     clearAddingToOrder();
@@ -144,7 +180,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     setSubmitting(true);
     setError(null);
 
-    const allergensPayload = allergyToggle ? orderAllergens : [];
+    const allergensPayload = [];
 
     const orderSnapshot = {
       items: items.map((i) => ({
@@ -154,6 +190,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
         size: i.size,
         milk: i.milk,
         category: i.category,
+        showDrinkModifiers: i.showDrinkModifiers ?? i.showCoffeeOptions,
         totalPrice: i.totalPrice,
       })),
       pickupMinutes,
@@ -201,7 +238,6 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
         });
         clearEditMode();
         clearCart();
-        setAllergyToggle(false);
         setOrderSuccess(true);
       } else {
         setOrderSuccessVariant('placed');
@@ -209,11 +245,19 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
         if (!pubKey) {
           setError('Checkout is not configured (missing VITE_STRIPE_PUBLISHABLE_KEY).');
         } else {
+          if (applyReward && rewardBelowStripeMin) {
+            setError(
+              `Total after reward must be at least £${(STRIPE_MIN_CHECKOUT_PENCE / 100).toFixed(2)}. Add another item or turn the reward off.`
+            );
+            setSubmitting(false);
+            return;
+          }
           const { sessionId, url } = await createCheckoutSession(authFetch, {
             line_items: orderLineItemsFromCartItems(items),
             customer_name: user.displayName,
             pickup_minutes: pickupMinutes,
             allergens: allergensPayload,
+            apply_reward: Boolean(applyReward && eligibleForReward && !rewardBelowStripeMin),
           });
           const stripe = await loadStripe(pubKey);
           if (!stripe) {
@@ -269,7 +313,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 38 }}
-            className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : tallSheet ? 'h-[90vh] max-h-[90vh]' : 'max-h-[90vh]'}`}
+            className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : tallSheet ? 'h-[90vh] max-h-[90vh]' : 'min-h-[75vh] max-h-[90vh]'}`}
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
           >
             {orderSuccess ? (
@@ -860,9 +904,76 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                           lineHeight: 1.4,
                         }}
                         >
-                          Save changes updates pickup, allergies, and your full cart together (not a separate payment).
+                          Save changes updates pickup and your full cart together (not a separate payment).
                         </p>
                       </>
+                    ) : null}
+
+                    {eligibleForReward ? (
+                      <label
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          background: 'rgba(200,144,42,0.08)',
+                          border: '1.5px solid rgba(200,144,42,0.25)',
+                          borderRadius: 16,
+                          padding: '12px 16px',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: '#1a2e1a',
+                            margin: 0,
+                          }}>
+                            Use free drink reward
+                          </p>
+                          <p style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 11,
+                            color: 'rgba(26,46,26,0.5)',
+                            margin: '4px 0 0',
+                            lineHeight: 1.35,
+                          }}>
+                            Up to £{(computeRewardDiscountPenceForCart(items) / 100).toFixed(2)} off your cheapest drink
+                            {rewardBelowStripeMin && applyReward
+                              ? ` — add items so the total stays above £${(STRIPE_MIN_CHECKOUT_PENCE / 100).toFixed(2)}.`
+                              : ''}
+                          </p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={applyReward}
+                          onChange={() => setApplyReward((v) => !v)}
+                          style={{ width: 22, height: 22, accentColor: '#1a2e1a', flexShrink: 0 }}
+                        />
+                      </label>
+                    ) : null}
+
+                    {applyReward && rewardDiscountPence > 0 && eligibleForReward ? (
+                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                        <span style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: 'rgba(26,46,26,0.5)',
+                        }}>
+                          Free drink reward
+                        </span>
+                        <span style={{
+                          fontFamily: 'Fraunces, Georgia, serif',
+                          fontSize: 16,
+                          fontWeight: 800,
+                          color: '#2d6b2d',
+                        }}>
+                          −£{(rewardDiscountPence / 100).toFixed(2)}
+                        </span>
+                      </div>
                     ) : null}
 
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -883,7 +994,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                         color: '#1a2e1a',
                         letterSpacing: '-0.03em',
                       }}>
-                        £{(subtotal / 100).toFixed(2)}
+                        £{(displayTotalPence / 100).toFixed(2)}
                       </span>
                     </div>
 
@@ -940,62 +1051,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                           </div>
                         </div>
 
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: 'rgba(255,255,255,0.35)',
-                            border: '1.5px solid #e0d0b0',
-                            borderRadius: 16,
-                            padding: '12px 16px',
-                          }}
-                        >
-                          <span style={{
-                            fontFamily: 'Plus Jakarta Sans, sans-serif',
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: '#1a2e1a',
-                          }}>
-                            Do you have any allergies?
-                          </span>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={allergyToggle}
-                            onClick={() => {
-                              setAllergyToggle((v) => !v);
-                              if (allergyToggle) setOrderAllergens([]);
-                            }}
-                            style={{
-                              width: 48,
-                              height: 28,
-                              borderRadius: 999,
-                              border: 'none',
-                              cursor: 'pointer',
-                              background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
-                              position: 'relative',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <span
-                              style={{
-                                position: 'absolute',
-                                top: 3,
-                                left: allergyToggle ? 24 : 3,
-                                width: 22,
-                                height: 22,
-                                borderRadius: '50%',
-                                background: '#f0e6d0',
-                                transition: 'left 0.15s ease',
-                              }}
-                            />
-                          </button>
-                        </div>
-
-                        {allergyToggle && (
-                          <AllergyChipsInput value={orderAllergens} onChange={setOrderAllergens} />
-                        )}
+                        {/* Allergen toggle + chips removed until a robust flow is implemented; checkout sends no allergens. */}
                       </>
                     ) : null}
 
@@ -1006,8 +1062,8 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                       disabled={submitting}
                       style={{
                         width: '100%',
-                        background: '#1a2e1a',
-                        color: '#f0e6d0',
+                        background: CHECKOUT_PRIMARY_GRADIENT,
+                        color: CHECKOUT_PRIMARY_TEXT,
                         borderRadius: 22,
                         padding: '18px 24px',
                         border: 'none',
@@ -1017,7 +1073,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                         justifyContent: 'center',
                         gap: 8,
                         opacity: submitting ? 0.6 : 1,
-                        boxShadow: '0 4px 20px rgba(26,46,26,0.3)',
+                        boxShadow: CHECKOUT_PRIMARY_SHADOW,
                       }}
                     >
                       {submitting ? (

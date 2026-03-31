@@ -1,4 +1,9 @@
 import { useNavigate } from 'react-router-dom';
+import {
+  CHECKOUT_PRIMARY_GRADIENT,
+  CHECKOUT_PRIMARY_SHADOW,
+  CHECKOUT_PRIMARY_TEXT,
+} from '../lib/checkoutTheme';
 
 export default function OrderPaymentCancelled() {
   const navigate = useNavigate();
@@ -11,7 +16,12 @@ export default function OrderPaymentCancelled() {
       <button
         type="button"
         onClick={() => navigate('/order', { replace: true })}
-        className="rounded-2xl bg-[#1a2e1a] text-[#f0e6d0] px-8 py-3 font-bold font-serif"
+        className="rounded-2xl px-8 py-3 font-bold font-serif border-none cursor-pointer"
+        style={{
+          background: CHECKOUT_PRIMARY_GRADIENT,
+          color: CHECKOUT_PRIMARY_TEXT,
+          boxShadow: CHECKOUT_PRIMARY_SHADOW,
+        }}
       >
         Return to menu
       </button>

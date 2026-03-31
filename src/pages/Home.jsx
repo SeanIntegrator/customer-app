@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DEMO_LOYALTY, EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
+import { EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useLoyalty } from '../context/LoyaltyContext';
 import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
 import { remainingMinutesUntilPickup } from '../lib/pickup';
 import EditOrderModal from '../components/EditOrderModal';
@@ -33,6 +34,7 @@ export default function Home() {
   const activeOrderRef = useRef(activeOrder);
   activeOrderRef.current = activeOrder;
   const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
+  const loyalty = useLoyalty();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
   const [showQR, setShowQR] = useState(false);
@@ -74,6 +76,8 @@ export default function Home() {
   refreshLiveOrderRef.current = refreshLiveOrder;
   const clearActiveOrderRef = useRef(clearActiveOrder);
   clearActiveOrderRef.current = clearActiveOrder;
+  const refreshLoyaltyRef = useRef(loyalty.refreshAfterOrder);
+  refreshLoyaltyRef.current = loyalty.refreshAfterOrder;
 
   useEffect(() => {
     const socket = getCafeSocket();
@@ -112,6 +116,7 @@ export default function Home() {
           (sq !== '' && ao.squareOrderId != null && String(ao.squareOrderId) === sq));
 
       if (matchServer || matchActive) refreshLiveOrderRef.current();
+      refreshLoyaltyRef.current();
     };
 
     socket.on('customerOrderCompleted', onKdsCompleted);
@@ -206,7 +211,12 @@ export default function Home() {
         onOpenQR={() => setShowQR(true)}
         registeredEvents={registeredEvents}
         promo={promo}
-        demoLoyalty={DEMO_LOYALTY}
+        loyaltyStamps={isAuthenticated ? loyalty.stampsCount : 0}
+        loyaltyGoal={loyalty.stampsGoal}
+        loyaltyStampsToNext={isAuthenticated ? loyalty.stampsToNextReward : loyalty.stampsGoal}
+        loyaltyRewardsAvailable={isAuthenticated ? loyalty.rewardsAvailable : 0}
+        loyaltyLoading={Boolean(isAuthenticated && loyalty.loading)}
+        isAuthenticated={isAuthenticated}
         hidePromotionalChips={goldCardModel != null && !bridgingCtaLoading}
         orderCount={isAuthenticated ? user?.orderCount ?? 0 : null}
         memberSinceLabel={isAuthenticated && user?.createdAt ? formatMemberSince(user.createdAt) : null}
@@ -257,11 +267,13 @@ export default function Home() {
             displayName={displayName}
             initials={profileInitials}
             avatarUrl={user?.avatarUrl}
-            stamps={DEMO_LOYALTY.stamps}
+            stamps={isAuthenticated ? loyalty.stampsCount : 0}
             memberSubline={
               isAuthenticated
-                ? `Demo loyalty · Member since ${DEMO_LOYALTY.memberSince}`
-                : `Sign in to save your card · Demo ${DEMO_LOYALTY.stamps} stamps`
+                ? user?.createdAt
+                  ? `Loyalty · Member since ${formatMemberSince(user.createdAt)}`
+                  : 'Your Clay & Bean loyalty card'
+                : 'Sign in to save your stamp card'
             }
           />
         )}

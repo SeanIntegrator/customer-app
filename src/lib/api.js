@@ -64,6 +64,24 @@ export async function cancelCustomerOrder(authFetch, orderId) {
   return data;
 }
 
+export async function fetchCustomerLoyalty(authFetch) {
+  const res = await authFetch(`${BASE}/api/customer/loyalty`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Failed to load loyalty');
+  }
+  return data;
+}
+
+export async function fetchCustomerRewards(authFetch) {
+  const res = await authFetch(`${BASE}/api/customer/rewards`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || 'Failed to load rewards');
+  }
+  return data;
+}
+
 export async function createCheckoutSession(authFetch, body) {
   const res = await authFetch(`${BASE}/api/stripe/create-checkout-session`, {
     method: 'POST',

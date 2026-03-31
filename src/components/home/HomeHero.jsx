@@ -12,7 +12,12 @@ export default function HomeHero({
   onOpenQR,
   registeredEvents,
   promo,
-  demoLoyalty,
+  loyaltyStamps = 0,
+  loyaltyGoal = 9,
+  loyaltyStampsToNext = 9,
+  loyaltyRewardsAvailable = 0,
+  loyaltyLoading = false,
+  isAuthenticated = false,
   /** When true (active gold card), hide event/promo chips and use a shorter hero. */
   hidePromotionalChips = false,
   orderCount = null,
@@ -161,13 +166,13 @@ export default function HomeHero({
                 }}
                 style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, color: '#f0e6d0', background: '#1a2e1a', border: 'none', borderRadius: 100, padding: '4px 11px', cursor: 'pointer', letterSpacing: '0.02em' }}
               >
-                ★ Stamps · {demoLoyalty.stamps}/{demoLoyalty.stampsGoal}
+                ★ Stamps · {loyaltyLoading ? '…' : `${loyaltyStamps}/${loyaltyGoal}`}
               </motion.button>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6 }}>
-              {Array.from({ length: demoLoyalty.stampsGoal }).map((_, i) => {
-                const filled = i < demoLoyalty.stamps;
+              {Array.from({ length: loyaltyGoal }).map((_, i) => {
+                const filled = !loyaltyLoading && i < loyaltyStamps;
                 return (
                   <motion.div
                     key={i}
@@ -193,9 +198,41 @@ export default function HomeHero({
 
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: 'rgba(26,46,26,0.65)', letterSpacing: '0.01em' }}>
-                {demoLoyalty.stampsGoal - demoLoyalty.stamps} to go until next reward
+                {loyaltyLoading
+                  ? 'Loading your card…'
+                  : !isAuthenticated
+                    ? 'Sign in to earn stamps on every order'
+                    : `${loyaltyStampsToNext} to go until next reward`}
               </p>
             </div>
+
+            {isAuthenticated && !loyaltyLoading && loyaltyRewardsAvailable > 0 ? (
+              <motion.button
+                type="button"
+                whileTap={{ scale: 0.98 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate('/rewards');
+                }}
+                style={{
+                  marginTop: 12,
+                  width: '100%',
+                  textAlign: 'left',
+                  background: 'rgba(26,46,26,0.06)',
+                  border: '1.5px solid rgba(26,46,26,0.12)',
+                  borderRadius: 14,
+                  padding: '10px 14px',
+                  cursor: 'pointer',
+                }}
+              >
+                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 800, color: '#1a2e1a', margin: 0 }}>
+                  {loyaltyRewardsAvailable} free drink{loyaltyRewardsAvailable === 1 ? '' : 's'} ready ☕
+                </p>
+                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.45)', margin: '4px 0 0' }}>
+                  Tap to view · use at checkout
+                </p>
+              </motion.button>
+            ) : null}
           </div>
         </motion.div>
       </motion.div>

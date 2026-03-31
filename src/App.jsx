@@ -8,7 +8,11 @@ const HAS_GOOGLE_CLIENT = Boolean(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 export default function App() {
   const location = useLocation();
-  const hideBottomNav = ['/order', '/order/success', '/order/cancelled'].includes(location.pathname);
+  const hideBottomNav = location.pathname.startsWith('/order');
+  const outletKey =
+    location.pathname === '/order' || location.pathname.startsWith('/order/menu/')
+      ? 'order'
+      : location.pathname;
 
   return (
     <>
@@ -16,7 +20,7 @@ export default function App() {
       <div className="flex flex-col h-full bg-cream overflow-hidden">
         <div className="flex-1 overflow-hidden relative">
           <AnimatePresence mode="wait">
-            <Outlet key={location.pathname} />
+            <Outlet key={outletKey} />
           </AnimatePresence>
         </div>
 
