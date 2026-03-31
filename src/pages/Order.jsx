@@ -167,12 +167,9 @@ export default function Order() {
 
   const showInProgressBanner = editOrderId != null || addingToOrderId != null;
 
+  /** Always go home — browser history can include /order/cancelled or Stripe return URLs behind /order. */
   const goBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate('/');
-    }
+    navigate('/');
   };
 
   return (

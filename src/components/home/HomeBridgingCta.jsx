@@ -9,11 +9,13 @@ const MIN_MINUTES_FOR_MODIFY = 5;
 export default function HomeBridgingCta({
   bridgingCtaLoading,
   goldCardModel,
+  basketUnpaidQty = 0,
   navigate,
   onEditOrderTap,
   onAddMoreTap,
   onCancelTap,
 }) {
+  const showBasketCta = basketUnpaidQty > 0;
   return (
     <div style={{ margin: '-42px 18px 0', position: 'relative', zIndex: 10 }}>
       <AnimatePresence mode="wait">
@@ -210,8 +212,31 @@ export default function HomeBridgingCta({
             style={{ width: '100%', background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', borderRadius: 24, padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', cursor: 'pointer' }}
           >
             <div>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.22em', textTransform: 'uppercase', color: 'rgba(18,32,18,0.52)', marginBottom: 5 }}>Ready to order?</p>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 28, fontWeight: 800, color: '#122012', letterSpacing: '-0.025em', lineHeight: 1.0 }}>Start your order</p>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.22em',
+                  textTransform: 'uppercase',
+                  color: 'rgba(18,32,18,0.52)',
+                  marginBottom: 5,
+                }}
+              >
+                {showBasketCta ? 'Finish and pay' : 'Ready to order?'}
+              </p>
+              <p
+                style={{
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 28,
+                  fontWeight: 800,
+                  color: '#122012',
+                  letterSpacing: '-0.025em',
+                  lineHeight: 1.0,
+                }}
+              >
+                {showBasketCta ? 'Complete order' : 'Start your order'}
+              </p>
             </div>
             <div style={{ position: 'relative', paddingBottom: 18, flexShrink: 0 }}>
               <span style={{ fontSize: 44, lineHeight: 1, display: 'block' }}>☕</span>

@@ -21,6 +21,8 @@ export function CartProvider({ children }) {
   const [editOrderId, setEditOrderId] = useState(null);
   /** Pay for add-ons: target DB order id; cart holds only new lines. */
   const [addingToOrderId, setAddingToOrderId] = useState(null);
+  /** Home sets when gold card shows a Stripe-paid order without add-to-order flow (hides nav badge for empty/stale cart). */
+  const [suppressNavBasketForPaidGoldCard, setSuppressNavBasketForPaidGoldCard] = useState(false);
   /** Opens the feedback sheet (after KDS marks the matching order complete). */
   const [postCheckoutFeedbackOrderId, setPostCheckoutFeedbackOrderId] = useState(null);
   /** @type {React.MutableRefObject<{ dbOrderId: number, squareOrderId: string }[]>} */
@@ -249,6 +251,8 @@ export function CartProvider({ children }) {
         clearPostCheckoutFeedback,
         registerPendingKdsFeedback,
         applyKdsOrderCompleted,
+        suppressNavBasketForPaidGoldCard,
+        setSuppressNavBasketForPaidGoldCard,
       }}
     >
       {children}

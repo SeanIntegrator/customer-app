@@ -18,7 +18,7 @@ export default function CancellationModal({ open, onClose, authFetch, order, onC
     setError(null);
     try {
       const data = await cancelCustomerOrder(authFetch, order.id);
-      onCancelled?.(data);
+      onCancelled?.(data, order.id);
       handleClose();
     } catch (e) {
       setError(e.message || 'Could not cancel. Please try again.');

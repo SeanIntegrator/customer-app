@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useCart } from '../context/CartContext';
+import { navBasketBadgeCount } from '../lib/basketUnpaidQty';
 
 const tabs = [
   {
@@ -34,12 +36,35 @@ const tabs = [
 
 export default function BottomNav() {
   const location = useLocation();
+  const { items, editOrderId, addingToOrderId, suppressNavBasketForPaidGoldCard } = useCart();
+  const orderBadgeCount = navBasketBadgeCount(
+    items,
+    editOrderId,
+    addingToOrderId,
+    suppressNavBasketForPaidGoldCard
+  );
 
   return (
     <nav className="flex-shrink-0 bg-bark border-t border-bark/20 safe-bottom">
       <div className="flex items-stretch">
         {tabs.map((tab) => {
           const active = location.pathname === tab.to;
+          const iconNode =
+            tab.to === '/order' ? (
+              <span className="relative inline-flex">
+                {tab.icon(active)}
+                {orderBadgeCount > 0 ? (
+                  <span
+                    className="absolute -top-1 -right-2 min-w-[17px] h-[17px] px-0.5 rounded-full bg-cream text-clay text-[9px] font-sans font-bold flex items-center justify-center leading-none shadow-sm ring-1 ring-bark/20"
+                    aria-label={`${orderBadgeCount} items in basket`}
+                  >
+                    {orderBadgeCount > 99 ? '99+' : orderBadgeCount}
+                  </span>
+                ) : null}
+              </span>
+            ) : (
+              tab.icon(active)
+            );
           return (
             <NavLink
               key={tab.to}
@@ -51,7 +76,7 @@ export default function BottomNav() {
                 transition={{ type: 'spring', stiffness: 400, damping: 28 }}
                 className={`flex flex-col items-center gap-1 ${active ? 'text-cream' : 'text-cream/60'}`}
               >
-                {tab.icon(active)}
+                {iconNode}
                 <span className={`text-[10px] font-sans font-semibold tracking-wide uppercase ${active ? 'text-cream' : 'text-cream/60'}`}>
                   {tab.label}
                 </span>

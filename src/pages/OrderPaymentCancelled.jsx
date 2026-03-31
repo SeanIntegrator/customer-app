@@ -10,7 +10,7 @@ export default function OrderPaymentCancelled() {
       </p>
       <button
         type="button"
-        onClick={() => navigate('/order')}
+        onClick={() => navigate('/order', { replace: true })}
         className="rounded-2xl bg-[#1a2e1a] text-[#f0e6d0] px-8 py-3 font-bold font-serif"
       >
         Return to menu

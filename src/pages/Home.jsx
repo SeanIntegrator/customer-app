@@ -16,10 +16,20 @@ import HomeEventsSection from '../components/home/HomeEventsSection';
 import HomeEventSignInModal from '../components/home/HomeEventSignInModal';
 import QRModal from '../components/home/QRModal';
 import { getCafeSocket } from '../lib/cafeSocket';
+import { unpaidBasketQuantity } from '../lib/basketUnpaidQty';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { activeOrder, loadCartFromOrderEdit, startAddingToOrder } = useCart();
+  const {
+    activeOrder,
+    items: cartItems,
+    editOrderId,
+    addingToOrderId,
+    loadCartFromOrderEdit,
+    startAddingToOrder,
+    clearActiveOrder,
+    setSuppressNavBasketForPaidGoldCard,
+  } = useCart();
   const activeOrderRef = useRef(activeOrder);
   activeOrderRef.current = activeOrder;
   const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
@@ -62,10 +72,27 @@ export default function Home() {
   serverLiveOrderRef.current = serverLiveOrder;
   const refreshLiveOrderRef = useRef(refreshLiveOrder);
   refreshLiveOrderRef.current = refreshLiveOrder;
+  const clearActiveOrderRef = useRef(clearActiveOrder);
+  clearActiveOrderRef.current = clearActiveOrder;
 
   useEffect(() => {
     const socket = getCafeSocket();
     if (!socket) return undefined;
+
+    const onOrderCancelled = (payload) => {
+      const dbId = payload?.dbOrderId;
+      if (dbId == null) return;
+      const cur = serverLiveOrderRef.current;
+      const ao = activeOrderRef.current;
+      const matchSrv = cur != null && Number(cur.id) === Number(dbId);
+      const aoId = ao?.dbOrderId ?? ao?.orderId;
+      const matchAo = aoId != null && Number(aoId) === Number(dbId);
+      if (matchSrv || matchAo) {
+        clearActiveOrderRef.current();
+        if (matchSrv) setServerLiveOrder(null);
+        refreshLiveOrderRef.current();
+      }
+    };
 
     const onKdsCompleted = (payload) => {
       const db = payload?.dbOrderId;
@@ -88,7 +115,11 @@ export default function Home() {
     };
 
     socket.on('customerOrderCompleted', onKdsCompleted);
-    return () => socket.off('customerOrderCompleted', onKdsCompleted);
+    socket.on('orderCancelled', onOrderCancelled);
+    return () => {
+      socket.off('customerOrderCompleted', onKdsCompleted);
+      socket.off('orderCancelled', onOrderCancelled);
+    };
   }, []);
 
   const goldCardModel = (() => {
@@ -129,6 +160,15 @@ export default function Home() {
   const bridgingCtaLoading =
     (isAuthenticated && (authLoading || ordersLoading) && !goldCardModel) ||
     (authLoading && hasAuthToken && !goldCardModel);
+
+  useEffect(() => {
+    setSuppressNavBasketForPaidGoldCard(
+      Boolean(goldCardModel?.is_paid_via_stripe && addingToOrderId == null)
+    );
+    return () => setSuppressNavBasketForPaidGoldCard(false);
+  }, [goldCardModel?.is_paid_via_stripe, addingToOrderId, setSuppressNavBasketForPaidGoldCard]);
+
+  const basketUnpaidQty = unpaidBasketQuantity(cartItems, editOrderId, addingToOrderId);
 
   const displayName = user?.displayName ?? 'Guest';
   const heroFirstName = isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Welcome.';
@@ -177,6 +217,7 @@ export default function Home() {
       <HomeBridgingCta
         bridgingCtaLoading={bridgingCtaLoading}
         goldCardModel={goldCardModel}
+        basketUnpaidQty={basketUnpaidQty}
         navigate={navigate}
         onEditOrderTap={(id) => {
           setEditingOrderId(id);
@@ -267,7 +308,13 @@ export default function Home() {
               }
             : null
         }
-        onCancelled={async (data) => {
+        onCancelled={async (data, cancelledOrderId) => {
+          clearActiveOrder();
+          if (cancelledOrderId != null) {
+            setServerLiveOrder((prev) =>
+              prev != null && Number(prev.id) === Number(cancelledOrderId) ? null : prev
+            );
+          }
           await refreshLiveOrder();
           const pence = data?.refunded_amount;
           if (pence != null && Number.isFinite(Number(pence))) {
