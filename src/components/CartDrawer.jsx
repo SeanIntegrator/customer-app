@@ -31,7 +31,7 @@ function lineMetaCaption(item) {
     [
       item.size !== 'Regular' && item.size,
       !['Full Fat', 'Regular'].includes(item.milk) && item.milk,
-      item.syrup && `${item.syrup} syrup`,
+      item.syrup,
       ...(item.alterations ?? []),
     ].filter(Boolean).join(', ') || (item.category === 'coffee' ? 'Regular' : null)
   );

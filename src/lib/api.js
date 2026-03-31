@@ -8,7 +8,8 @@ export function orderLineItemsFromCartItems(cartItems) {
     const mods = [];
     if (item.size && item.size !== 'Regular') mods.push({ name: item.size, price: 0 });
     if (item.milk && !DEFAULT_MILKS.includes(item.milk)) mods.push({ name: item.milk, price: 0 });
-    if (item.syrup) mods.push({ name: `${item.syrup} syrup`, price: 0 });
+    // Syrup state is already the Square modifier name (e.g. "Vanilla Syrup"); do not append " syrup".
+    if (item.syrup) mods.push({ name: String(item.syrup).trim(), price: 0 });
     for (const a of item.alterations ?? []) mods.push({ name: a, price: 0 });
     const cn = item.customerNote != null ? String(item.customerNote).trim() : '';
     return {
