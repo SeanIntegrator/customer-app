@@ -5,6 +5,7 @@ import { getPriceForItem, getEmojiForItem } from '../data/mock';
 
 /**
  * @param {Array<{ id: string, name: string, price?: number|null, categoryName?: string|null, categoryId?: string|null }>} raw
+ * Drops £0 items (pence ≤ 0) — admin / comp SKUs not shown in order-ahead.
  */
 export function enrichCatalogRaw(raw) {
   const filtered = raw.filter((item) => !isRetailSquareCategory(item.categoryName));
@@ -12,7 +13,11 @@ export function enrichCatalogRaw(raw) {
   /** @type {Record<string, { categorySlug: string, squareCategoryName: string | null, showDrinkModifiers: boolean }>} */
   const variationById = {};
 
-  const items = filtered.map((item) => {
+  const items = [];
+  for (const item of filtered) {
+    const pricePence = getPriceForItem(item.name, item.price);
+    if (!Number.isFinite(pricePence) || pricePence <= 0) continue;
+
     const squareCategoryName = item.categoryName?.trim() ?? null;
     const categoryId = item.categoryId ?? null;
     const menuBucket = menuBucketSlugForSquareCategory(squareCategoryName);
@@ -20,13 +25,14 @@ export function enrichCatalogRaw(raw) {
     const enriched = {
       catalogObjectId: item.id,
       name: item.name,
-      price: getPriceForItem(item.name, item.price),
+      price: pricePence,
       emoji: getEmojiForItem(item.name),
       squareCategoryName,
       categoryId,
       category: menuBucket,
       showDrinkModifiers,
     };
+    items.push(enriched);
     if (item.id) {
       variationById[item.id] = {
         categorySlug: menuBucket,
@@ -34,8 +40,7 @@ export function enrichCatalogRaw(raw) {
         showDrinkModifiers,
       };
     }
-    return enriched;
-  });
+  }
 
   const hasOther = items.some((i) => i.category === 'other');
   const menuCategories = [

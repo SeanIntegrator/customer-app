@@ -124,32 +124,62 @@ export default function Rewards() {
               </p>
             )}
 
-            <h2 style={{ ...headStyle, fontSize: 17, marginBottom: 12 }}>Redemption history</h2>
+            <h2 style={{ ...headStyle, fontSize: 17, marginBottom: 12 }}>Reward history</h2>
             {data.recent_redemptions?.length ? (
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {data.recent_redemptions.map((row, idx) => (
-                  <li
-                    key={`${row.order_id}-${row.redeemed_at}-${idx}`}
-                    style={{
-                      background: 'rgba(255,255,255,0.45)',
-                      border: '1px solid #e0d0b0',
-                      borderRadius: 14,
-                      padding: '12px 14px',
-                      fontFamily: 'Plus Jakarta Sans, sans-serif',
-                      fontSize: 13,
-                      color: '#1a2e1a',
-                    }}
-                  >
-                    <span style={{ fontWeight: 700 }}>−£{((row.discount_amount || 0) / 100).toFixed(2)}</span>
-                    <span style={{ color: 'rgba(26,46,26,0.45)' }}>
-                      {' '}
-                      · Order #{row.order_id}
-                      {row.redeemed_at
-                        ? ` · ${new Date(row.redeemed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                        : ''}
-                    </span>
-                  </li>
-                ))}
+                {data.recent_redemptions.map((row, idx) => {
+                  const dateStr = row.redeemed_at
+                    ? new Date(row.redeemed_at).toLocaleDateString('en-GB', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                      })
+                    : '';
+                  const bottomLine = [row.item_name, dateStr].filter(Boolean).join(' · ') || dateStr || 'Redeemed';
+                  return (
+                    <li
+                      key={`${row.order_id}-${row.redeemed_at}-${idx}`}
+                      style={{
+                        background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)',
+                        borderRadius: 18,
+                        padding: '16px 18px',
+                        border: '1.5px solid #e0d0b0',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
+                        opacity: 0.72,
+                        filter: 'saturate(0.65)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                        <p
+                          style={{
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 18,
+                            fontWeight: 800,
+                            color: '#1a2e1a',
+                            margin: 0,
+                          }}
+                        >
+                          Free drink
+                        </p>
+                        <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }} aria-hidden>
+                          ☕
+                        </span>
+                      </div>
+                      <p
+                        style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 12,
+                          color: 'rgba(26,46,26,0.48)',
+                          margin: 0,
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {bottomLine}
+                      </p>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: 'rgba(26,46,26,0.45)' }}>No redemptions yet.</p>

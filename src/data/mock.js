@@ -11,8 +11,9 @@ export const EVENTS = [
   {
     id: 1,
     title: 'Morning Brew & Sketch',
-    date: 'Sat 15 Mar',
+    date: 'Sat 12 Apr',
     time: '9:00 – 11:00am',
+    startsAt: '2026-04-12T08:00:00.000Z',
     description: 'Bring your sketchbook and let the morning light guide your pencil while the coffee keeps you warm. We supply the brews, you bring the curiosity — all levels welcome.',
     spotsLeft: 4,
     totalSpots: 12,
@@ -23,8 +24,9 @@ export const EVENTS = [
   {
     id: 2,
     title: 'Wine Tasting With Sean',
-    date: 'Thu 20 Mar',
+    date: 'Thu 17 Apr',
     time: '6:30 – 8:30pm',
+    startsAt: '2026-04-17T17:30:00.000Z',
     description: 'A guided journey through small-batch natural wines sourced from passionate local producers who let the land do the talking. No stuffy formality — just great wine and even better conversation.',
     spotsLeft: 8,
     totalSpots: 20,
@@ -35,8 +37,9 @@ export const EVENTS = [
   {
     id: 3,
     title: 'Book Swap Morning',
-    date: 'Sun 23 Mar',
+    date: 'Sun 20 Apr',
     time: '10:00am – 12:00pm',
+    startsAt: '2026-04-20T09:00:00.000Z',
     description: "Bring a book you loved and leave with one you haven't read yet — the best kind of serendipity. Coffee discounts run all morning to fuel your next chapter.",
     spotsLeft: null,
     totalSpots: null,
@@ -47,33 +50,15 @@ export const EVENTS = [
   {
     id: 4,
     title: 'Sourdough Workshop',
-    date: 'Sat 29 Mar',
+    date: 'Sat 3 May',
     time: '11:00am – 1:00pm',
+    startsAt: '2026-05-03T10:00:00.000Z',
     description: "Get your hands in the dough and learn the ancient craft of sourdough from our head baker, who's been nursing the same starter for over a decade. You'll leave with technique, knowledge, and a jar of live culture to take home.",
     spotsLeft: 2,
     totalSpots: 8,
     emoji: '🍞',
     registered: false,
     category: 'workshop',
-  },
-];
-
-export const PAST_EVENTS = [
-  {
-    id: 10,
-    title: 'Lino Printing Workshop',
-    date: 'Sat 1 Feb',
-    emoji: '🖨️',
-    attended: true,
-    description: 'You carved your own lino block and pressed it into a print to take home. A slow, satisfying afternoon that left ink on fingers and smiles on faces.',
-  },
-  {
-    id: 11,
-    title: 'Fermentation Tasting',
-    date: 'Thu 13 Feb',
-    emoji: '🫙',
-    attended: true,
-    description: 'A deep dive into kombucha, kimchi and wild-fermented sodas from producers across the county. The room smelled wonderfully strange and tasted even better.',
   },
 ];
 

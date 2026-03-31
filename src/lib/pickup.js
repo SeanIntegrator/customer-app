@@ -63,6 +63,18 @@ export function goldCardPickupChipLabel(minutes) {
   return minutes === PICKUP_MIN_PICKUP ? 'ASAP' : `~${minutes} mins`;
 }
 
+/**
+ * Minimum whole minutes remaining before pickup to allow adding items or changing the basket
+ * (aligned with HomeBridgingCta "Add more items").
+ */
+export const ORDER_MODIFY_CUTOFF_MINUTES = 5;
+
+/** True when pickup is soon enough that the app should block basket edits / add-to-order. */
+export function isPickupTooCloseForOrderModify(iso) {
+  if (!iso) return false;
+  return remainingMinutesUntilPickup(iso) <= ORDER_MODIFY_CUTOFF_MINUTES;
+}
+
 /** One-line copy for menu in-progress bar (pickup_time ISO from API). */
 export function orderReadyInOneLine(iso) {
   if (!iso) return 'Order in progress';

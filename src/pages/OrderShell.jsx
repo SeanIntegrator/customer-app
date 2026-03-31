@@ -5,7 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import useCatalog from '../hooks/useCatalog';
 import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
-import { PAPER_GRAIN_BACKGROUND, orderReadyInOneLine } from '../lib/pickup';
+import { PAPER_GRAIN_BACKGROUND, orderReadyInOneLine, isPickupTooCloseForOrderModify } from '../lib/pickup';
 import {
   CHECKOUT_PRIMARY_GRADIENT,
   CHECKOUT_PRIMARY_SHADOW,
@@ -171,6 +171,9 @@ export default function OrderShell() {
   };
 
   const showInProgressBanner = editOrderId != null || addingToOrderId != null;
+
+  const orderModifyLocked =
+    showInProgressBanner && isPickupTooCloseForOrderModify(inProgressPickupIso);
 
   const goBack = () => {
     if (location.pathname.startsWith('/order/menu/')) {
@@ -445,11 +448,13 @@ export default function OrderShell() {
         syrupOptions={syrupOptions}
         alterationOptions={alterationOptions}
         addDisabled={addToMenuBlocked && !cartEditLine}
+        orderModifyLocked={orderModifyLocked}
       />
 
       <CartDrawer
         open={cartOpen}
         onClose={() => setCartOpen(false)}
+        orderModifyLocked={orderModifyLocked}
         onEditLine={(line) => {
           setCartEditLine(line);
           setCartOpen(false);

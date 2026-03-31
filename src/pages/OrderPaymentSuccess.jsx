@@ -205,6 +205,7 @@ export default function OrderPaymentSuccess() {
         variant="placed"
         pickupMinutes={pickupMinutesFromOrder(order)}
         onDone={handleDone}
+        stampPreviewTotalPence={order?.total_amount != null ? Number(order.total_amount) : undefined}
       />
     </div>
   );

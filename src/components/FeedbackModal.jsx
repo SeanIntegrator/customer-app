@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { submitOrderFeedback } from '../lib/api';
+import { submitOrderFeedback, fetchCustomerOrder } from '../lib/api';
+import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 
 const CREAM = '#f0e6d0';
 const GREEN = '#1a2e1a';
@@ -57,6 +58,7 @@ export default function FeedbackModal({ isOpen, orderId, fetchImpl, onClose, onC
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [hint, setHint] = useState('');
+  const [earnedStamps, setEarnedStamps] = useState(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -73,8 +75,30 @@ export default function FeedbackModal({ isOpen, orderId, fetchImpl, onClose, onC
       setComment('');
       setSubmitting(false);
       setHint('');
+      setEarnedStamps(null);
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || orderId === '' || orderId == null) {
+      setEarnedStamps(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const o = await fetchCustomerOrder(fetchImpl, orderId);
+        if (cancelled) return;
+        const { stamps } = previewStampsEarnedForOrderTotal(o.total_amount);
+        setEarnedStamps(stamps);
+      } catch {
+        if (!cancelled) setEarnedStamps(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, orderId, fetchImpl]);
 
   useEffect(() => {
     if (rating != null) setHint('');
@@ -184,6 +208,36 @@ export default function FeedbackModal({ isOpen, orderId, fetchImpl, onClose, onC
                 ×
               </button>
             </div>
+
+            {earnedStamps != null ? (
+              <div
+                style={{
+                  marginBottom: 16,
+                  padding: '12px 14px',
+                  borderRadius: 16,
+                  background: earnedStamps > 0 ? 'rgba(200,144,42,0.12)' : 'rgba(26,46,26,0.06)',
+                  border: `1.5px solid ${earnedStamps > 0 ? 'rgba(200,144,42,0.28)' : 'rgba(26,46,26,0.1)'}`,
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: GREEN,
+                    margin: 0,
+                    textAlign: 'center',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {earnedStamps === 0
+                    ? 'This order was under £2 — no stamp this time.'
+                    : earnedStamps === 2
+                      ? 'You earned 2 stamps on this order.'
+                      : 'You earned 1 stamp on this order.'}
+                </p>
+              </div>
+            ) : null}
 
             <h2
               id="feedback-modal-title"

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
 import { fetchCustomerOrder, updateCustomerOrder } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import OrderSuccess from './OrderSuccess';
@@ -163,10 +164,19 @@ export default function EditOrderModal({
     }
   };
 
-  const handleSuccessDone = () => {
+  const handleSuccessDone = useCallback(() => {
     setUpdateSuccess(false);
     onClose();
-  };
+  }, [onClose]);
+
+  const onSwipeClose = useCallback(() => {
+    if (updateSuccess) handleSuccessDone();
+    else if (!loading) onClose();
+  }, [updateSuccess, loading, onClose, handleSuccessDone]);
+
+  const { sheetMotionProps, onGreenHeaderPointerDown } = useSheetSwipeToClose(onSwipeClose, {
+    disabled: loading && !updateSuccess,
+  });
 
   return (
     <AnimatePresence>
@@ -209,9 +219,24 @@ export default function EditOrderModal({
               background: '#f0e6d0',
               boxShadow: '0 -8px 48px rgba(0,0,0,0.35)',
             }}
+            {...sheetMotionProps}
           >
             {updateSuccess ? (
               <div style={{ flex: 1, position: 'relative', minHeight: 'min(70vh, 520px)' }}>
+                <div
+                  role="presentation"
+                  aria-hidden
+                  onPointerDown={onGreenHeaderPointerDown}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 96,
+                    zIndex: 1,
+                    touchAction: 'none',
+                  }}
+                />
                 <OrderSuccess
                   variant="updated"
                   pickupMinutes={pickupMinutes}
@@ -221,10 +246,12 @@ export default function EditOrderModal({
             ) : (
               <>
                 <div
+                  onPointerDown={onGreenHeaderPointerDown}
                   style={{
                     flexShrink: 0,
                     background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
                     position: 'relative',
+                    touchAction: 'none',
                   }}
                 >
                   <div
@@ -261,6 +288,7 @@ export default function EditOrderModal({
                     </h2>
                     <button
                       type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={onClose}
                       style={{
                         width: 32,

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
 import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS, getSyrupChipColors } from '../data/mock';
 import {
   CHECKOUT_PRIMARY_GRADIENT,
@@ -28,6 +29,8 @@ export default function ItemDetailSheet({
   syrupOptions = SYRUP_OPTIONS,
   alterationOptions = [],
   addDisabled = false,
+  /** When true (in-flight order + pickup within ORDER_MODIFY_CUTOFF), block all edits and add/save. */
+  orderModifyLocked = false,
 }) {
   const [size, setSize] = useState('Regular');
   const [milk, setMilk] = useState('Full Fat');
@@ -44,6 +47,7 @@ export default function ItemDetailSheet({
 
   const isEdit = Boolean(editCartLine?.cartId);
   const lockedLineEdit = Boolean(isEdit && editCartLine?.fromExistingOrder);
+  const formLocked = orderModifyLocked || lockedLineEdit;
 
   useEffect(() => {
     if (!item) return;
@@ -87,7 +91,7 @@ export default function ItemDetailSheet({
   const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
-    if (!item || addDisabled) return;
+    if (!item || addDisabled || orderModifyLocked) return;
     const noteTrim = customerNote.trim();
     if (isEdit && onSaveCartLine) {
       if (editCartLine.fromExistingOrder) {
@@ -133,6 +137,8 @@ export default function ItemDetailSheet({
   };
 
   const showDrinkUi = item?.showDrinkModifiers ?? item?.showCoffeeOptions ?? false;
+
+  const { sheetMotionProps, onGreenHeaderPointerDown } = useSheetSwipeToClose(onClose);
 
   const sectionLabel = {
     fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -190,14 +196,19 @@ export default function ItemDetailSheet({
               display: 'flex',
               flexDirection: 'column',
             }}
+            {...sheetMotionProps}
           >
             {/* Dark green hero header */}
-            <div style={{
-              background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
-              position: 'relative',
-              flexShrink: 0,
-              overflow: 'hidden',
-            }}>
+            <div
+              onPointerDown={onGreenHeaderPointerDown}
+              style={{
+                background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
+                position: 'relative',
+                flexShrink: 0,
+                overflow: 'hidden',
+                touchAction: 'none',
+              }}
+            >
               {/* Grain */}
               <div style={{
                 position: 'absolute',
@@ -239,6 +250,33 @@ export default function ItemDetailSheet({
               </div>
             </div>
 
+            {orderModifyLocked ? (
+              <div
+                role="status"
+                style={{
+                  flexShrink: 0,
+                  margin: 0,
+                  padding: '12px 20px',
+                  background: 'rgba(179, 74, 42, 0.1)',
+                  borderBottom: '1px solid rgba(179, 74, 42, 0.22)',
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: '#5c2e22',
+                    margin: 0,
+                    lineHeight: 1.45,
+                    textAlign: 'center',
+                  }}
+                >
+                  It is too close to your pickup time to edit your order.
+                </p>
+              </div>
+            ) : null}
+
             <div
               style={{
                 position: 'relative',
@@ -258,7 +296,7 @@ export default function ItemDetailSheet({
                   paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 0px))',
                 }}
               >
-              {lockedLineEdit ? (
+              {!orderModifyLocked && lockedLineEdit ? (
                 <p
                   style={{
                     fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -275,8 +313,8 @@ export default function ItemDetailSheet({
 
               <div
                 style={{
-                  pointerEvents: lockedLineEdit ? 'none' : 'auto',
-                  opacity: lockedLineEdit ? 0.5 : 1,
+                  pointerEvents: formLocked ? 'none' : 'auto',
+                  opacity: formLocked ? 0.5 : 1,
                 }}
               >
               {/* Size picker */}
@@ -287,6 +325,8 @@ export default function ItemDetailSheet({
                     {sizeOptions.map((opt) => (
                       <button
                         key={opt.name}
+                        type="button"
+                        disabled={formLocked}
                         onClick={() => setSize(opt.name)}
                         style={{
                           flex: 1,
@@ -321,6 +361,8 @@ export default function ItemDetailSheet({
                     {milkOptionsVisible.map((opt) => (
                       <button
                         key={opt.name}
+                        type="button"
+                        disabled={formLocked}
                         onClick={() => setMilk(opt.name)}
                         style={{
                           padding: '9px 16px',
@@ -348,6 +390,7 @@ export default function ItemDetailSheet({
                 <div style={{ marginBottom: 20 }}>
                   <button
                     type="button"
+                    disabled={formLocked}
                     onClick={() => setSyrupAccordionOpen((o) => !o)}
                     style={{
                       width: '100%',
@@ -418,6 +461,7 @@ export default function ItemDetailSheet({
                               <button
                                 key={opt.name}
                                 type="button"
+                                disabled={formLocked}
                                 onClick={() => setSyrup((cur) => (cur === opt.name ? null : opt.name))}
                                 style={{
                                   padding: '9px 16px',
@@ -456,6 +500,8 @@ export default function ItemDetailSheet({
                       return (
                         <button
                           key={opt.name}
+                          type="button"
+                          disabled={formLocked}
                           onClick={() => toggleAlteration(opt.name)}
                           style={{
                             padding: '9px 16px',
@@ -484,6 +530,7 @@ export default function ItemDetailSheet({
                 <span style={sectionLabel}>Add a note</span>
                 <textarea
                   value={customerNote}
+                  readOnly={formLocked}
                   onChange={(e) => setCustomerNote(e.target.value)}
                   placeholder=""
                   rows={2}
@@ -508,6 +555,8 @@ export default function ItemDetailSheet({
                 <span style={sectionLabel}>Quantity</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
                   <button
+                    type="button"
+                    disabled={formLocked}
                     onClick={() => setQuantity((q) => Math.max(1, q - 1))}
                     style={{
                       width: 36,
@@ -537,6 +586,8 @@ export default function ItemDetailSheet({
                     {quantity}
                   </span>
                   <button
+                    type="button"
+                    disabled={formLocked}
                     onClick={() => setQuantity((q) => q + 1)}
                     style={{
                       width: 36,
@@ -558,7 +609,7 @@ export default function ItemDetailSheet({
                 </div>
               </div>
 
-              {addDisabled && (
+              {addDisabled && !orderModifyLocked && (
                 <p
                   style={{
                     fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -588,26 +639,49 @@ export default function ItemDetailSheet({
               >
                 <motion.button
                   type="button"
-                  whileTap={addDisabled || lockedLineEdit ? {} : { scale: 0.97 }}
-                  onClick={lockedLineEdit ? onClose : handleAdd}
-                  disabled={addDisabled && !lockedLineEdit}
+                  whileTap={
+                    lockedLineEdit || addDisabled || orderModifyLocked ? {} : { scale: 0.97 }
+                  }
+                  onClick={() => {
+                    if (lockedLineEdit) {
+                      onClose();
+                      return;
+                    }
+                    handleAdd();
+                  }}
+                  disabled={!lockedLineEdit && (addDisabled || orderModifyLocked)}
                   style={{
                     width: '100%',
                     background:
-                      addDisabled && !lockedLineEdit ? 'rgba(26,46,26,0.12)' : CHECKOUT_PRIMARY_GRADIENT,
-                    color: addDisabled && !lockedLineEdit ? 'rgba(26,46,26,0.35)' : CHECKOUT_PRIMARY_TEXT,
+                      !lockedLineEdit && (addDisabled || orderModifyLocked)
+                        ? 'rgba(26,46,26,0.12)'
+                        : CHECKOUT_PRIMARY_GRADIENT,
+                    color:
+                      !lockedLineEdit && (addDisabled || orderModifyLocked)
+                        ? 'rgba(26,46,26,0.35)'
+                        : CHECKOUT_PRIMARY_TEXT,
                     borderRadius: 22,
                     padding: '18px 24px',
                     border: 'none',
-                    cursor: addDisabled && !lockedLineEdit ? 'not-allowed' : 'pointer',
+                    cursor:
+                      !lockedLineEdit && (addDisabled || orderModifyLocked) ? 'not-allowed' : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    boxShadow: addDisabled && !lockedLineEdit ? 'none' : CHECKOUT_PRIMARY_SHADOW,
+                    boxShadow:
+                      !lockedLineEdit && (addDisabled || orderModifyLocked) ? 'none' : CHECKOUT_PRIMARY_SHADOW,
                   }}
                 >
                   <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                    {lockedLineEdit ? 'Close' : addDisabled ? 'Please wait…' : isEdit ? 'Save changes' : 'Add to order'}
+                    {lockedLineEdit
+                      ? 'Close'
+                      : addDisabled
+                        ? 'Please wait…'
+                        : orderModifyLocked
+                          ? 'Too close to pickup'
+                          : isEdit
+                            ? 'Save changes'
+                            : 'Add to order'}
                   </span>
                   {!lockedLineEdit ? (
                     <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>

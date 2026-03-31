@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EVENTS, PAST_EVENTS, PROMOTIONS } from '../data/mock';
+import { PROMOTIONS } from '../data/mock';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useLoyalty } from '../context/LoyaltyContext';
@@ -13,11 +13,12 @@ import OrderCancelledSuccess from '../components/OrderCancelledSuccess';
 import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
 import HomeHero from '../components/home/HomeHero';
 import HomeBridgingCta from '../components/home/HomeBridgingCta';
-import HomeEventsSection from '../components/home/HomeEventsSection';
-import HomeEventSignInModal from '../components/home/HomeEventSignInModal';
+import HomeWhatsOnSection from '../components/home/HomeWhatsOnSection';
 import QRModal from '../components/home/QRModal';
 import { getCafeSocket } from '../lib/cafeSocket';
 import { unpaidBasketQuantity } from '../lib/basketUnpaidQty';
+import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
+import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -35,10 +36,7 @@ export default function Home() {
   activeOrderRef.current = activeOrder;
   const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
   const loyalty = useLoyalty();
-  const [events, setEvents] = useState(EVENTS);
-  const [showPast, setShowPast] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [showEventSignIn, setShowEventSignIn] = useState(false);
   const [serverLiveOrder, setServerLiveOrder] = useState(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [editOrderOpen, setEditOrderOpen] = useState(false);
@@ -162,6 +160,12 @@ export default function Home() {
     return null;
   })();
 
+  const pendingStampEarnCount = useMemo(() => {
+    const ta = goldCardModel?.total_amount;
+    if (ta == null) return 0;
+    return previewStampsEarnedForOrderTotal(ta).stamps;
+  }, [goldCardModel?.total_amount]);
+
   const bridgingCtaLoading =
     (isAuthenticated && (authLoading || ordersLoading) && !goldCardModel) ||
     (authLoading && hasAuthToken && !goldCardModel);
@@ -179,20 +183,13 @@ export default function Home() {
   const heroFirstName = isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Welcome.';
   const profileInitials = user ? initialsFromName(user.displayName) : '?';
 
-  const toggleEvent = (id) => {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
-  };
+  const closeCancelSuccess = useCallback(() => {
+    setCancelSuccess({ open: false, refundedPence: 0 });
+    navigate('/');
+  }, [navigate]);
 
-  const handleEventToggle = (id) => {
-    if (!isAuthenticated) {
-      setShowEventSignIn(true);
-      return;
-    }
-    toggleEvent(id);
-  };
-
-  const promo = PROMOTIONS[0];
-  const registeredEvents = events.filter((e) => e.registered);
+  const { sheetMotionProps: cancelSuccessSheetMotion, onGreenHeaderPointerDown: cancelSuccessHeaderDrag } =
+    useSheetSwipeToClose(closeCancelSuccess);
 
   return (
     <motion.div
@@ -208,20 +205,17 @@ export default function Home() {
         user={user}
         profileInitials={profileInitials}
         heroFirstName={heroFirstName}
-        onOpenQR={() => setShowQR(true)}
-        registeredEvents={registeredEvents}
-        promo={promo}
+        onOpenLoyaltyCard={() => setShowQR(true)}
         loyaltyStamps={isAuthenticated ? loyalty.stampsCount : 0}
         loyaltyGoal={loyalty.stampsGoal}
         loyaltyStampsToNext={isAuthenticated ? loyalty.stampsToNextReward : loyalty.stampsGoal}
         loyaltyRewardsAvailable={isAuthenticated ? loyalty.rewardsAvailable : 0}
         loyaltyLoading={Boolean(isAuthenticated && loyalty.loading)}
         isAuthenticated={isAuthenticated}
+        pendingStampEarnCount={goldCardModel != null && !bridgingCtaLoading ? pendingStampEarnCount : 0}
         hidePromotionalChips={goldCardModel != null && !bridgingCtaLoading}
         orderCount={isAuthenticated ? user?.orderCount ?? 0 : null}
         memberSinceLabel={isAuthenticated && user?.createdAt ? formatMemberSince(user.createdAt) : null}
-        pastEventsCount={PAST_EVENTS.length}
-        registeredEventsCount={registeredEvents.length}
       />
 
       <HomeBridgingCta
@@ -250,14 +244,50 @@ export default function Home() {
         onCancelTap={() => setCancelModalOpen(true)}
       />
 
-      <div style={{ padding: '48px 18px 60px' }}>
-        <HomeEventsSection
-          events={events}
-          pastEvents={PAST_EVENTS}
-          showPast={showPast}
-          setShowPast={setShowPast}
-          onEventToggle={handleEventToggle}
-        />
+      <div style={{ padding: '0 18px 56px', marginTop: 36 }}>
+        <div
+          style={{
+            background: '#f0e6d0',
+            border: '1px solid rgba(26,46,26,0.1)',
+            borderRadius: 14,
+            padding: '14px 16px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 12,
+          }}
+        >
+          <span style={{ fontSize: 18, flexShrink: 0, opacity: 0.85 }} aria-hidden>
+            {PROMOTIONS[0].emoji}
+          </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p
+              style={{
+                fontFamily: 'Fraunces, Georgia, serif',
+                fontSize: 15,
+                fontWeight: 700,
+                color: 'rgba(26,46,26,0.72)',
+                margin: '0 0 4px',
+                lineHeight: 1.25,
+              }}
+            >
+              {PROMOTIONS[0].title}
+            </p>
+            <p
+              style={{
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'rgba(26,46,26,0.55)',
+                margin: 0,
+                lineHeight: 1.45,
+              }}
+            >
+              {PROMOTIONS[0].description}
+            </p>
+          </div>
+        </div>
+
+        <HomeWhatsOnSection />
       </div>
 
       <AnimatePresence>
@@ -278,8 +308,6 @@ export default function Home() {
           />
         )}
       </AnimatePresence>
-
-      <HomeEventSignInModal open={showEventSignIn} onClose={() => setShowEventSignIn(false)} />
 
       <EditOrderModal
         orderId={editingOrderId}
@@ -357,14 +385,25 @@ export default function Home() {
               transition={{ type: 'spring', stiffness: 350, damping: 38 }}
               className="fixed bottom-0 left-0 right-0 rounded-t-3xl z-[210] h-[70vh] flex flex-col"
               style={{ background: '#f0e6d0', overflow: 'hidden' }}
+              {...cancelSuccessSheetMotion}
             >
-              <OrderCancelledSuccess
-                refundedAmountPence={cancelSuccess.refundedPence}
-                onDone={() => {
-                  setCancelSuccess({ open: false, refundedPence: 0 });
-                  navigate('/');
-                }}
-              />
+              <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div
+                  role="presentation"
+                  aria-hidden
+                  onPointerDown={cancelSuccessHeaderDrag}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 96,
+                    zIndex: 1,
+                    touchAction: 'none',
+                  }}
+                />
+                <OrderCancelledSuccess refundedAmountPence={cancelSuccess.refundedPence} onDone={closeCancelSuccess} />
+              </div>
             </motion.div>
           </>
         )}

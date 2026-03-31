@@ -32,6 +32,8 @@ import {
   CHECKOUT_PRIMARY_SHADOW,
   CHECKOUT_PRIMARY_TEXT,
 } from '../lib/checkoutTheme';
+import { previewStampsEarnedForOrderTotal, penceNeededForNextStamp } from '../lib/loyaltyStampPreview';
+import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
 
 const stepperBtn = checkoutStepperButtonStyle;
 
@@ -65,7 +67,7 @@ function PenIcon() {
   );
 }
 
-export default function CartDrawer({ open, onClose, onEditLine }) {
+export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocked = false }) {
   const navigate = useNavigate();
   const {
     items,
@@ -88,6 +90,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
   const [error, setError] = useState(null);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderSuccessVariant, setOrderSuccessVariant] = useState('placed');
+  const [orderSuccessStampTotalPence, setOrderSuccessStampTotalPence] = useState(null);
   const [pickupMinutes, setPickupMinutes] = useState(DEFAULT_PICKUP_MINUTES);
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
   const [lockedOrder, setLockedOrder] = useState(null);
@@ -119,10 +122,16 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     if (!open) {
       setOrderSuccess(false);
       setOrderSuccessVariant('placed');
+      setOrderSuccessStampTotalPence(null);
     }
   }, [open]);
 
   const isUpdateEditMode = editOrderId != null && addingToOrderId == null;
+  const basketLocked =
+    orderModifyLocked && (editOrderId != null || addingToOrderId != null);
+  /** Block quantity / line edit for new basket lines when pickup is too soon. */
+  const lineEditsBlocked = (item) =>
+    basketLocked && (addingToOrderId != null || !item.fromExistingOrder);
   const tallSheet = !orderSuccess && (editOrderId != null || addingToOrderId != null);
   const existingItems = useMemo(() => items.filter((i) => i.fromExistingOrder), [items]);
   const newItems = useMemo(() => items.filter((i) => !i.fromExistingOrder), [items]);
@@ -142,6 +151,20 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
   useEffect(() => {
     if (!eligibleForReward) setApplyReward(false);
   }, [eligibleForReward, setApplyReward]);
+
+  const cartStampPreviewLine = useMemo(() => {
+    if (!isAuthenticated || !isFreshStripeCheckout || items.length === 0) return null;
+    const preview = previewStampsEarnedForOrderTotal(subtotal);
+    if (preview.stamps === 2) {
+      return "You'll earn 2 stamps when you collect this order — Double Stamp Tuesday.";
+    }
+    if (preview.stamps === 1) {
+      return "You'll earn 1 stamp when you collect this order (orders £2+).";
+    }
+    const need = penceNeededForNextStamp(subtotal);
+    if (need <= 0) return null;
+    return `Add £${(need / 100).toFixed(2)} to earn a stamp (orders £2+).`;
+  }, [isAuthenticated, isFreshStripeCheckout, items.length, subtotal]);
 
   const rewardDiscountPence = useMemo(
     () => (applyReward && eligibleForReward ? computeRewardDiscountPenceForCart(items) : 0),
@@ -167,11 +190,14 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     onClose();
   };
 
+  const { sheetMotionProps, onGreenHeaderPointerDown } = useSheetSwipeToClose(handleSheetClose);
+
   const adjustPickup = (delta) => {
     setPickupMinutes((m) => adjustPickupStepper(m, delta));
   };
 
   const handlePlaceOrder = async () => {
+    if (basketLocked) return;
     if (items.length === 0 || submitting) return;
     if (!isAuthenticated) {
       setShowCheckoutSignIn(true);
@@ -230,6 +256,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
           pickup_minutes: pickupMinutes,
           line_items: orderLineItemsFromCartItems(items),
         });
+        setOrderSuccessStampTotalPence(Number(updated.total_amount) || 0);
         setActiveOrder({
           ...orderSnapshot,
           orderId: updated.id,
@@ -315,21 +342,41 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
             transition={{ type: 'spring', stiffness: 350, damping: 38 }}
             className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : tallSheet ? 'h-[90vh] max-h-[90vh]' : 'min-h-[75vh] max-h-[90vh]'}`}
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
+            {...sheetMotionProps}
           >
             {orderSuccess ? (
-              <OrderSuccess
-                variant={orderSuccessVariant}
-                onDone={handleSuccessDone}
-                pickupMinutes={pickupMinutes}
-              />
+              <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <div
+                  role="presentation"
+                  aria-hidden
+                  onPointerDown={onGreenHeaderPointerDown}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: 96,
+                    zIndex: 1,
+                    touchAction: 'none',
+                  }}
+                />
+                <OrderSuccess
+                  variant={orderSuccessVariant}
+                  onDone={handleSuccessDone}
+                  pickupMinutes={pickupMinutes}
+                  stampPreviewTotalPence={orderSuccessStampTotalPence ?? undefined}
+                />
+              </div>
             ) : (
               <>
                 <div
                   className="flex-shrink-0"
+                  onPointerDown={onGreenHeaderPointerDown}
                   style={{
                     background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
                     position: 'relative',
                     overflow: 'hidden',
+                    touchAction: 'none',
                   }}
                 >
                   <div style={{
@@ -361,6 +408,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                     </h2>
                     <button
                       type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={handleSheetClose}
                       style={{
                         width: 32,
@@ -381,6 +429,32 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                     </button>
                   </div>
                 </div>
+
+                {basketLocked ? (
+                  <div
+                    role="status"
+                    className="flex-shrink-0"
+                    style={{
+                      padding: '12px 20px',
+                      background: 'rgba(179, 74, 42, 0.1)',
+                      borderBottom: '1px solid rgba(179, 74, 42, 0.22)',
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: '#5c2e22',
+                        margin: 0,
+                        lineHeight: 1.45,
+                        textAlign: 'center',
+                      }}
+                    >
+                      It is too close to your pickup time to edit your order.
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0" style={{ padding: '12px 20px' }}>
                   {isUpdateEditMode ? (
@@ -479,7 +553,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                             lineHeight: 1.45,
                           }}
                         >
-                          Add items from the menu, then open the cart again to save everything together.
+                          Nothing added yet.
                         </p>
                       ) : (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -523,7 +597,10 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                                   <button
                                     type="button"
                                     aria-label={`Edit ${item.name}`}
-                                    onClick={() => onEditLine?.(item)}
+                                    disabled={lineEditsBlocked(item)}
+                                    onClick={() => {
+                                      if (!lineEditsBlocked(item)) onEditLine?.(item);
+                                    }}
                                     style={{
                                       flexShrink: 0,
                                       width: 32,
@@ -535,7 +612,8 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                                       display: 'flex',
                                       alignItems: 'center',
                                       justifyContent: 'center',
-                                      cursor: 'pointer',
+                                      cursor: lineEditsBlocked(item) ? 'not-allowed' : 'pointer',
+                                      opacity: lineEditsBlocked(item) ? 0.4 : 1,
                                     }}
                                   >
                                     <PenIcon />
@@ -567,7 +645,12 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                               </div>
                               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <button type="button" onClick={() => updateQuantity(item.cartId, -1)} style={stepperBtn}>
+                                  <button
+                                    type="button"
+                                    disabled={lineEditsBlocked(item)}
+                                    onClick={() => updateQuantity(item.cartId, -1)}
+                                    style={{ ...stepperBtn, opacity: lineEditsBlocked(item) ? 0.35 : 1 }}
+                                  >
                                     −
                                   </button>
                                   <span
@@ -582,7 +665,12 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                                   >
                                     {item.quantity}
                                   </span>
-                                  <button type="button" onClick={() => updateQuantity(item.cartId, 1)} style={stepperBtn}>
+                                  <button
+                                    type="button"
+                                    disabled={lineEditsBlocked(item)}
+                                    onClick={() => updateQuantity(item.cartId, 1)}
+                                    style={{ ...stepperBtn, opacity: lineEditsBlocked(item) ? 0.35 : 1 }}
+                                  >
                                     +
                                   </button>
                                 </div>
@@ -717,7 +805,10 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                               <button
                                 type="button"
                                 aria-label={`Edit ${item.name}`}
-                                onClick={() => onEditLine?.(item)}
+                                disabled={lineEditsBlocked(item)}
+                                onClick={() => {
+                                  if (!lineEditsBlocked(item)) onEditLine?.(item);
+                                }}
                                 style={{
                                   flexShrink: 0,
                                   width: 32,
@@ -729,7 +820,8 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'center',
-                                  cursor: 'pointer',
+                                  cursor: lineEditsBlocked(item) ? 'not-allowed' : 'pointer',
+                                  opacity: lineEditsBlocked(item) ? 0.4 : 1,
                                 }}
                               >
                                 <PenIcon />
@@ -758,7 +850,14 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
 
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                              <button type="button" onClick={() => updateQuantity(item.cartId, -1)} style={stepperBtn}>−</button>
+                              <button
+                                type="button"
+                                disabled={lineEditsBlocked(item)}
+                                onClick={() => updateQuantity(item.cartId, -1)}
+                                style={{ ...stepperBtn, opacity: lineEditsBlocked(item) ? 0.35 : 1 }}
+                              >
+                                −
+                              </button>
                               <span style={{
                                 fontFamily: 'Fraunces, Georgia, serif',
                                 fontSize: 15,
@@ -769,7 +868,14 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                               }}>
                                 {item.quantity}
                               </span>
-                              <button type="button" onClick={() => updateQuantity(item.cartId, 1)} style={stepperBtn}>+</button>
+                              <button
+                                type="button"
+                                disabled={lineEditsBlocked(item)}
+                                onClick={() => updateQuantity(item.cartId, 1)}
+                                style={{ ...stepperBtn, opacity: lineEditsBlocked(item) ? 0.35 : 1 }}
+                              >
+                                +
+                              </button>
                             </div>
                             <p style={{
                               fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -784,6 +890,21 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                         </motion.div>
                       ))}
                     </div>
+                  ) : null}
+
+                  {cartStampPreviewLine ? (
+                    <p
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'rgba(26,46,26,0.48)',
+                        margin: '14px 0 4px',
+                        lineHeight: 1.45,
+                      }}
+                    >
+                      {cartStampPreviewLine}
+                    </p>
                   ) : null}
                 </div>
 
@@ -867,7 +988,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                             fontWeight: 600,
                             color: 'rgba(26,46,26,0.5)',
                           }}>
-                            Already on order
+                            Already ordered
                           </span>
                           <span style={{
                             fontFamily: 'Fraunces, Georgia, serif',
@@ -896,16 +1017,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                             £{(newSubtotal / 100).toFixed(2)}
                           </span>
                         </div>
-                        <p style={{
-                          fontFamily: 'Plus Jakarta Sans, sans-serif',
-                          fontSize: 11,
-                          color: 'rgba(26,46,26,0.45)',
-                          margin: '0 0 4px',
-                          lineHeight: 1.4,
-                        }}
-                        >
-                          Save changes updates pickup and your full cart together (not a separate payment).
-                        </p>
+                        
                       </>
                     ) : null}
 
@@ -1032,8 +1144,11 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                             <button
                               type="button"
                               onClick={() => adjustPickup(-PICKUP_STEP)}
-                              disabled={pickupMinutes === PICKUP_MIN_PICKUP}
-                              style={{ ...stepperBtn, opacity: pickupMinutes === PICKUP_MIN_PICKUP ? 0.3 : 1 }}
+                              disabled={basketLocked || pickupMinutes === PICKUP_MIN_PICKUP}
+                              style={{
+                                ...stepperBtn,
+                                opacity: basketLocked || pickupMinutes === PICKUP_MIN_PICKUP ? 0.3 : 1,
+                              }}
                             >
                               −
                             </button>
@@ -1047,7 +1162,14 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                             }}>
                               {pickupMinutes === PICKUP_MIN_PICKUP ? 'ASAP' : `${pickupMinutes}m`}
                             </span>
-                            <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>+</button>
+                            <button
+                              type="button"
+                              disabled={basketLocked}
+                              onClick={() => adjustPickup(PICKUP_STEP)}
+                              style={{ ...stepperBtn, opacity: basketLocked ? 0.3 : 1 }}
+                            >
+                              +
+                            </button>
                           </div>
                         </div>
 
@@ -1056,24 +1178,24 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                     ) : null}
 
                     <motion.button
-                      whileTap={{ scale: 0.97 }}
+                      whileTap={{ scale: basketLocked || submitting ? 1 : 0.97 }}
                       type="button"
                       onClick={handlePlaceOrder}
-                      disabled={submitting}
+                      disabled={submitting || basketLocked}
                       style={{
                         width: '100%',
-                        background: CHECKOUT_PRIMARY_GRADIENT,
-                        color: CHECKOUT_PRIMARY_TEXT,
+                        background: basketLocked ? 'rgba(26,46,26,0.12)' : CHECKOUT_PRIMARY_GRADIENT,
+                        color: basketLocked ? 'rgba(26,46,26,0.35)' : CHECKOUT_PRIMARY_TEXT,
                         borderRadius: 22,
                         padding: '18px 24px',
                         border: 'none',
-                        cursor: submitting ? 'not-allowed' : 'pointer',
+                        cursor: submitting || basketLocked ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 8,
                         opacity: submitting ? 0.6 : 1,
-                        boxShadow: CHECKOUT_PRIMARY_SHADOW,
+                        boxShadow: basketLocked ? 'none' : CHECKOUT_PRIMARY_SHADOW,
                       }}
                     >
                       {submitting ? (
@@ -1088,7 +1210,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                         </>
                       ) : (
                         <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                          {addingToOrderId != null ? 'Pay for add-ons' : editOrderId != null ? 'Save changes' : 'Place order'}
+                          {addingToOrderId != null ? 'Pay for new items' : editOrderId != null ? 'Save changes' : 'Place order'}
                         </span>
                       )}
                     </motion.button>

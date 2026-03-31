@@ -1,10 +1,8 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { goldCardPickupChipLabel } from '../../lib/pickup';
+import { goldCardPickupChipLabel, ORDER_MODIFY_CUTOFF_MINUTES } from '../../lib/pickup';
 import Steam from './Steam';
 
 const DEFAULT_MILKS = ['Full Fat', 'Regular'];
-
-const MIN_MINUTES_FOR_MODIFY = 5;
 
 export default function HomeBridgingCta({
   bridgingCtaLoading,
@@ -17,7 +15,7 @@ export default function HomeBridgingCta({
 }) {
   const showBasketCta = basketUnpaidQty > 0;
   return (
-    <div style={{ margin: '-42px 18px 0', position: 'relative', zIndex: 10 }}>
+    <div style={{ margin: '-42px 18px 6px', position: 'relative', zIndex: 10 }}>
       <AnimatePresence mode="wait">
         {bridgingCtaLoading ? (
           <motion.div
@@ -130,7 +128,7 @@ export default function HomeBridgingCta({
               </div>
 
               {goldCardModel.editable &&
-              goldCardModel.pickupMinutes > MIN_MINUTES_FOR_MODIFY &&
+              goldCardModel.pickupMinutes > ORDER_MODIFY_CUTOFF_MINUTES &&
               (onAddMoreTap || (onCancelTap && goldCardModel.is_paid_via_stripe)) ? (
                 <div
                   onClick={(e) => e.stopPropagation()}

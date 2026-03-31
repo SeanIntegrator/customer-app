@@ -1,9 +1,11 @@
 import { motion } from 'framer-motion';
-import QRCode from './QRCode';
+import { useSheetSwipeToClose } from '../../lib/useSheetSwipeToClose';
 
 const LOYALTY_MODAL_GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E")`;
 
 export default function QRModal({ onClose, displayName, initials, avatarUrl, stamps, memberSubline }) {
+  const { sheetMotionProps, onGreenHeaderPointerDown } = useSheetSwipeToClose(onClose);
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -19,28 +21,39 @@ export default function QRModal({ onClose, displayName, initials, avatarUrl, sta
         transition={{ type: 'spring', stiffness: 300, damping: 28 }}
         style={{ background: 'linear-gradient(148deg, #1e3822 0%, #142012 100%)', borderRadius: 28, padding: '30px 26px 26px', width: '100%', margin: '0 16px', boxShadow: '0 -8px 60px rgba(0,0,0,0.5)', position: 'relative', overflow: 'hidden' }}
         onClick={(e) => e.stopPropagation()}
+        {...sheetMotionProps}
       >
+        <div
+          role="presentation"
+          aria-hidden
+          onPointerDown={onGreenHeaderPointerDown}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 100,
+            zIndex: 2,
+            touchAction: 'none',
+            borderRadius: '28px 28px 0 0',
+          }}
+        />
         <div style={{ position: 'absolute', inset: 0, backgroundImage: LOYALTY_MODAL_GRAIN, pointerEvents: 'none', borderRadius: 28 }} />
         <motion.div
           style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(200,144,42,0.22) 0%, transparent 65%)', pointerEvents: 'none' }}
           animate={{ scale: [1, 1.25, 1], opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
         />
-        <div style={{ position: 'relative' }}>
+        <div style={{ position: 'relative', zIndex: 1 }}>
           <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase', color: '#c8902a', marginBottom: 5 }}>
             ✦ Clay & Bean
           </p>
           <h2 style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 28, fontWeight: 800, color: '#f0e6d0', letterSpacing: '-0.025em', lineHeight: 1.1, marginBottom: 4 }}>
             Your loyalty card
           </h2>
-          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: 'rgba(240,230,208,0.55)', marginBottom: 26 }}>
-            Show this to your barista to earn stamps
+          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: 'rgba(240,230,208,0.55)', marginBottom: 22 }}>
+            Stamps add up when you collect app orders. View rewards anytime from your profile.
           </p>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
-            <div style={{ background: '#f0e6d0', padding: 14, borderRadius: 18, boxShadow: '0 6px 28px rgba(0,0,0,0.28)' }}>
-              <QRCode size={152} />
-            </div>
-          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, padding: '14px 16px', marginBottom: 18 }}>
             <div style={{ width: 38, height: 38, borderRadius: '50%', background: avatarUrl ? 'transparent' : 'linear-gradient(140deg, #c8902a, #deb040)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 800, color: '#122012', flexShrink: 0, overflow: 'hidden' }}>
               {avatarUrl ? (
@@ -60,6 +73,7 @@ export default function QRModal({ onClose, displayName, initials, avatarUrl, sta
           </div>
           <button
             type="button"
+            onPointerDown={(e) => e.stopPropagation()}
             onClick={onClose}
             style={{ width: '100%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, padding: '14px', fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, fontWeight: 600, color: 'rgba(240,230,208,0.6)', cursor: 'pointer', letterSpacing: '0.03em' }}
           >

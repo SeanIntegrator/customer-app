@@ -9,21 +9,19 @@ export default function HomeHero({
   user,
   profileInitials,
   heroFirstName,
-  onOpenQR,
-  registeredEvents,
-  promo,
+  onOpenLoyaltyCard,
   loyaltyStamps = 0,
   loyaltyGoal = 9,
   loyaltyStampsToNext = 9,
   loyaltyRewardsAvailable = 0,
   loyaltyLoading = false,
   isAuthenticated = false,
-  /** When true (active gold card), hide event/promo chips and use a shorter hero. */
+  /** Stamps expected when the in-flight gold-card order is collected (0 if under £2). */
+  pendingStampEarnCount = 0,
+  /** When true (active gold card), use a shorter hero. */
   hidePromotionalChips = false,
   orderCount = null,
   memberSinceLabel = null,
-  pastEventsCount = 0,
-  registeredEventsCount = 0,
 }) {
   const heroHeight = hidePromotionalChips ? 'clamp(240px, 48vh, 480px)' : 'clamp(280px, 52vh, 560px)';
   const heroPaddingTop = hidePromotionalChips ? 32 : 40;
@@ -136,12 +134,12 @@ export default function HomeHero({
       
       </div>
 
-      <div style={{ flex: hidePromotionalChips ? 0.22 : 0.32 }} />
+      <div style={{ flex: hidePromotionalChips ? 0.3 : 0.42 }} />
 
-      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, type: 'spring', stiffness: 260, damping: 28 }} style={{ padding: '0 18px', marginBottom: 26, position: 'relative', zIndex: 1 }}>
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22, type: 'spring', stiffness: 260, damping: 28 }} style={{ padding: '0 18px', marginTop: 22, marginBottom: 26, position: 'relative', zIndex: 1 }}>
         <motion.div
           whileTap={{ scale: 0.982 }}
-          onClick={onOpenQR}
+          onClick={onOpenLoyaltyCard}
           style={{
             background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)',
             borderRadius: 20,
@@ -172,22 +170,42 @@ export default function HomeHero({
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6 }}>
               {Array.from({ length: loyaltyGoal }).map((_, i) => {
-                const filled = !loyaltyLoading && i < loyaltyStamps;
+                const filled = isAuthenticated && !loyaltyLoading && i < loyaltyStamps;
+                const pending =
+                  isAuthenticated &&
+                  !loyaltyLoading &&
+                  pendingStampEarnCount > 0 &&
+                  i >= loyaltyStamps &&
+                  i < loyaltyStamps + pendingStampEarnCount;
                 return (
                   <motion.div
                     key={i}
                     initial={false}
-                    animate={filled ? { scale: 1, opacity: 1 } : { scale: 0.88, opacity: 0.5 }}
+                    animate={
+                      filled
+                        ? { scale: 1, opacity: 1 }
+                        : pending
+                          ? { scale: 0.94, opacity: 0.88 }
+                          : { scale: 0.88, opacity: 0.5 }
+                    }
                     transition={{ type: 'spring', stiffness: 420, damping: 22, delay: filled ? i * 0.04 : 0 }}
                     style={{
                       aspectRatio: '1',
                       borderRadius: '50%',
-                      background: filled ? 'linear-gradient(140deg, #c8902a, #d8aa38)' : 'rgba(26,46,26,0.1)',
-                      border: filled ? '1px solid rgba(210,160,50,0.5)' : '1.5px solid rgba(26,46,26,0.18)',
+                      background: filled
+                        ? 'linear-gradient(140deg, #c8902a, #d8aa38)'
+                        : pending
+                          ? 'linear-gradient(145deg, rgba(90,130,90,0.22), rgba(120,160,120,0.28))'
+                          : 'rgba(26,46,26,0.1)',
+                      border: filled
+                        ? '1px solid rgba(210,160,50,0.5)'
+                        : pending
+                          ? '1.5px solid rgba(60,100,60,0.28)'
+                          : '1.5px solid rgba(26,46,26,0.18)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: filled ? '0 2px 6px rgba(180,120,20,0.28)' : 'none',
+                      boxShadow: filled ? '0 2px 6px rgba(180,120,20,0.28)' : pending ? '0 1px 4px rgba(40,80,40,0.12)' : 'none',
                     }}
                   >
                     {filled && <div style={{ width: '38%', height: '38%', borderRadius: '50%', background: 'rgba(255,245,210,0.65)' }} />}
@@ -201,7 +219,7 @@ export default function HomeHero({
                 {loyaltyLoading
                   ? 'Loading your card…'
                   : !isAuthenticated
-                    ? 'Sign in to earn stamps on every order'
+                    ? 'Sign in to earn stamps on qualifying orders (£2+) when you collect'
                     : `${loyaltyStampsToNext} to go until next reward`}
               </p>
             </div>
@@ -209,7 +227,9 @@ export default function HomeHero({
             {isAuthenticated && !loyaltyLoading && loyaltyRewardsAvailable > 0 ? (
               <motion.button
                 type="button"
-                whileTap={{ scale: 0.98 }}
+                whileTap={{ scale: 0.985 }}
+                animate={{ boxShadow: ['0 12px 36px rgba(26,46,26,0.12)', '0 14px 40px rgba(60,100,60,0.14)', '0 12px 36px rgba(26,46,26,0.12)'] }}
+                transition={{ boxShadow: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' } }}
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate('/rewards');
@@ -218,65 +238,29 @@ export default function HomeHero({
                   marginTop: 12,
                   width: '100%',
                   textAlign: 'left',
-                  background: 'rgba(26,46,26,0.06)',
-                  border: '1.5px solid rgba(26,46,26,0.12)',
-                  borderRadius: 14,
-                  padding: '10px 14px',
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 18,
+                  fontWeight: 800,
+                  color: '#1a2e1a',
+                  background: 'linear-gradient(165deg, #fffdf8 0%, #f5f0e4 45%, #ebe4d4 100%)',
+                  border: '1px solid rgba(26,46,26,0.1)',
+                  borderRadius: 20,
+                  padding: '12px 16px',
                   cursor: 'pointer',
+                  boxShadow: '0 12px 36px rgba(26,46,26,0.12), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
                 }}
               >
-                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 800, color: '#1a2e1a', margin: 0 }}>
-                  {loyaltyRewardsAvailable} free drink{loyaltyRewardsAvailable === 1 ? '' : 's'} ready ☕
-                </p>
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.45)', margin: '4px 0 0' }}>
-                  Tap to view · use at checkout
-                </p>
+                <span style={{ display: 'block', marginBottom: 6 }}>
+                  {loyaltyRewardsAvailable} free drink{loyaltyRewardsAvailable === 1 ? '' : 's'} available
+                </span>
+                <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 600, color: 'rgba(26,46,26,0.48)' }}>
+                  Redeem at checkout
+                </span>
               </motion.button>
             ) : null}
           </div>
         </motion.div>
       </motion.div>
-
-      {!hidePromotionalChips && (
-        <div style={{ position: 'relative', padding: '0 18px 28px', zIndex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {registeredEvents.map((event, idx) => (
-            <motion.div
-              key={event.id}
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.22 + idx * 0.08, type: 'spring', stiffness: 300, damping: 28 }}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.11)', borderRadius: 16, padding: '13px 16px' }}
-            >
-              <span style={{ fontSize: 20, flexShrink: 0 }}>{event.emoji}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 700, color: '#f0e6d0', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{event.title}</p>
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(240,230,208,0.5)' }}>
-                  {event.date} · {event.time}
-                </p>
-              </div>
-              <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, color: '#7aca7a', background: 'rgba(80,180,80,0.14)', border: '1px solid rgba(80,180,80,0.22)', borderRadius: 100, padding: '3px 10px', flexShrink: 0, letterSpacing: '0.05em' }}>
-                ✓ Going
-              </span>
-            </motion.div>
-          ))}
-
-          <motion.div
-            initial={{ opacity: 0, x: -16 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.22 + registeredEvents.length * 0.08, type: 'spring', stiffness: 300, damping: 28 }}
-            style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'rgba(200,144,42,0.1)', border: '1px solid rgba(200,144,42,0.2)', borderRadius: 16, padding: '13px 16px' }}
-          >
-            <motion.span style={{ fontSize: 20, flexShrink: 0, display: 'block' }} animate={{ scale: [1, 1.18, 1] }} transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}>
-              {promo.emoji}
-            </motion.span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 700, color: '#f0e6d0', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{promo.title}</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(240,230,208,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{promo.description}</p>
-            </div>
-            <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#c8902a', background: 'rgba(200,144,42,0.18)', padding: '3px 9px', borderRadius: 100, flexShrink: 0 }}>{promo.tag}</span>
-          </motion.div>
-        </div>
-      )}
     </div>
   );
 }

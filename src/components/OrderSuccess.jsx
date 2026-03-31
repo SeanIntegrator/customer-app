@@ -1,18 +1,30 @@
 import { motion } from 'framer-motion';
+import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 
 const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
+
+function futureStampLine(totalPence) {
+  const { stamps } = previewStampsEarnedForOrderTotal(totalPence);
+  if (stamps === 0) return "You'll earn stamps when you collect orders of £2+ — this one is under £2.";
+  if (stamps === 2) return "You'll earn 2 stamps when you collect — Double Stamp Tuesday.";
+  return `You'll earn ${stamps} stamp when you collect.`;
+}
 
 /**
  * Checkout success screen. For `variant="placed"`, the app registers the order for pickup feedback once KDS marks it complete (socket `customerOrderCompleted`).
  *
  * @param {'placed' | 'updated'} [variant]
+ * @param {number} [stampPreviewTotalPence] — order total in pence; shows future-tense stamp copy until KDS completes.
  */
-export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'placed' }) {
+export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'placed', stampPreviewTotalPence }) {
   const updated = variant === 'updated';
   const title = updated ? 'Order successfully updated' : 'Order placed!';
   const subline = updated
     ? 'Your baristas have your latest order.'
     : 'Your order is with the baristas.';
+  const stampLine = Number.isFinite(Number(stampPreviewTotalPence))
+    ? futureStampLine(Number(stampPreviewTotalPence))
+    : null;
 
   return (
     <motion.div
@@ -104,6 +116,23 @@ export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'pl
         }}>
           {subline}
         </p>
+        {stampLine ? (
+          <p
+            style={{
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'rgba(240,230,208,0.52)',
+              margin: '0 0 12px',
+              lineHeight: 1.45,
+              maxWidth: 320,
+              marginLeft: 'auto',
+              marginRight: 'auto',
+            }}
+          >
+            {stampLine}
+          </p>
+        ) : null}
         <p style={{
           fontFamily: 'Plus Jakarta Sans, sans-serif',
           fontSize: 13,

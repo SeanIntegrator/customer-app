@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { EVENTS, PAST_EVENTS } from '../data/mock';
+import { EVENTS } from '../data/mock';
+import { filterAttended, filterRegisteredUpcoming } from '../lib/eventsSchedule';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useLoyalty } from '../context/LoyaltyContext';
@@ -9,6 +10,7 @@ import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
 import { fetchCustomerOrders } from '../lib/api';
 import { findUsualOrderFromHistory, apiOrderItemsToCartLines } from '../lib/usualOrder';
 import SignInButton from '../components/SignInButton';
+import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 
 const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E")`;
 
@@ -18,32 +20,6 @@ const EVENT_GRADIENTS = [
   'linear-gradient(148deg, #7a5008 0%, #a87020 55%, #c89038 100%)',
   'linear-gradient(148deg, #4a2810 0%, #7a4820 55%, #a06830 100%)',
 ];
-
-// ── QR CODE (same logic as Home) ──────────────────────────────────────────
-
-function QRCode({ size = 110 }) {
-  const M = 10, G = 21;
-  const isFilled = (r, c) => {
-    if (r < 8 && c < 8) return false;
-    if (r < 8 && c > G - 9) return false;
-    if (r > G - 9 && c < 8) return false;
-    if (r === 6 && c > 7 && c < G - 8) return c % 2 === 0;
-    if (c === 6 && r > 7 && r < G - 8) return r % 2 === 0;
-    return (r * 31 + c * 17 + r * c * 7 + (r ^ c) * 3) % 100 < 48;
-  };
-  const S = M * G;
-  const modules = [];
-  for (let r = 0; r < G; r++) for (let c = 0; c < G; c++) if (isFilled(r, c)) modules.push([c * M, r * M]);
-  return (
-    <svg viewBox={`0 0 ${S} ${S}`} width={size} height={size}>
-      <rect width={S} height={S} fill="white" />
-      {modules.map(([x, y], i) => <rect key={i} x={x+0.5} y={y+0.5} width={M-1} height={M-1} rx="1.5" fill="#122012" />)}
-      <rect x={0} y={0} width={M*7} height={M*7} rx={6} fill="#122012" /><rect x={M} y={M} width={M*5} height={M*5} rx={4} fill="white" /><rect x={M*2} y={M*2} width={M*3} height={M*3} rx={2} fill="#122012" />
-      <rect x={M*14} y={0} width={M*7} height={M*7} rx={6} fill="#122012" /><rect x={M*15} y={M} width={M*5} height={M*5} rx={4} fill="white" /><rect x={M*16} y={M*2} width={M*3} height={M*3} rx={2} fill="#122012" />
-      <rect x={0} y={M*14} width={M*7} height={M*7} rx={6} fill="#122012" /><rect x={M} y={M*15} width={M*5} height={M*5} rx={4} fill="white" /><rect x={M*2} y={M*16} width={M*3} height={M*3} rx={2} fill="#122012" />
-    </svg>
-  );
-}
 
 // ── STAR RATING ───────────────────────────────────────────────────────────
 
@@ -137,6 +113,21 @@ function orderSummaryLine(order) {
   return items.map((it) => (it.quantity > 1 ? `${it.quantity}× ` : '') + (it.item_name || 'Item')).join(', ');
 }
 
+function startOfWeekMonday(ref) {
+  const x = new Date(ref);
+  const day = x.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  x.setDate(x.getDate() + diff);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function startOfCalendarMonth(ref) {
+  return new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
+}
+
+const ORDERS_PAGE_SIZE = 6;
+
 export default function Profile() {
   const navigate = useNavigate();
   const { activeOrder, clearActiveOrder, replaceCartLines, editOrderId, addingToOrderId } = useCart();
@@ -156,6 +147,8 @@ export default function Profile() {
   const [completedOrders, setCompletedOrders] = useState([]);
   const [ordersForUsual, setOrdersForUsual] = useState([]);
   const [livePendingOrder, setLivePendingOrder] = useState(null);
+  const [ordersHorizon, setOrdersHorizon] = useState('week');
+  const [ordersPage, setOrdersPage] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -193,19 +186,58 @@ export default function Profile() {
     };
   }, [isAuthenticated, authFetch]);
 
+  useEffect(() => {
+    setExpandedOrder(null);
+    setOrdersPage(0);
+  }, [ordersHorizon]);
+
+  useEffect(() => {
+    setExpandedOrder(null);
+  }, [ordersPage]);
+
   const usualResult = useMemo(() => findUsualOrderFromHistory(ordersForUsual), [ordersForUsual]);
+
+  const pendingStampEarnCount = useMemo(() => {
+    const ta = livePendingOrder?.total_amount;
+    if (ta == null) return 0;
+    return previewStampsEarnedForOrderTotal(ta).stamps;
+  }, [livePendingOrder]);
 
   /** Server pending/confirmed, or cart tied to an in-flight order (avoid stale activeOrder after pickup). */
   const hasExistingOrderInProgress =
     livePendingOrder != null || editOrderId != null || addingToOrderId != null;
 
-  const upcomingEvents = events.filter((e) => e.registered);
+  const upcomingEvents = filterRegisteredUpcoming(events);
+  const attendedEvents = filterAttended(events);
   const displayName = user?.displayName ?? 'Guest';
   const profileInitials = user ? initialsFromName(user.displayName) : 'G';
   const heroFirstName = isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Friend.';
   const memberSinceLabel = user?.createdAt ? formatMemberSince(user.createdAt) : null;
   const orderCount = user?.orderCount ?? 0;
-  const eventsEngagementCount = PAST_EVENTS.length + upcomingEvents.length;
+  const eventsEngagementCount = attendedEvents.length + upcomingEvents.length;
+
+  const filteredCompletedOrders = useMemo(() => {
+    if (!completedOrders.length) return [];
+    const now = new Date();
+    if (ordersHorizon === 'all') return completedOrders;
+    const start = ordersHorizon === 'month' ? startOfCalendarMonth(now) : startOfWeekMonday(now);
+    return completedOrders.filter((o) => {
+      if (!o.created_at) return false;
+      return new Date(o.created_at) >= start;
+    });
+  }, [completedOrders, ordersHorizon]);
+
+  const ordersPageCount = Math.max(1, Math.ceil(filteredCompletedOrders.length / ORDERS_PAGE_SIZE));
+
+  const paginatedCompletedOrders = useMemo(() => {
+    const start = ordersPage * ORDERS_PAGE_SIZE;
+    return filteredCompletedOrders.slice(start, start + ORDERS_PAGE_SIZE);
+  }, [filteredCompletedOrders, ordersPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredCompletedOrders.length / ORDERS_PAGE_SIZE) - 1);
+    setOrdersPage((p) => Math.min(p, maxPage));
+  }, [filteredCompletedOrders.length]);
 
   const handleRate = (id, stars) => setRatings((r) => ({ ...r, [id]: stars }));
   const toggleEvent = (id) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
@@ -534,87 +566,106 @@ export default function Profile() {
               {/* Card header row */}
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px', borderBottom: '1px solid rgba(26,46,26,0.08)' }}>
                 <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>
-                  Clay &amp; Bean · Loyalty Card
+                  Loyalty Card
                 </p>
                 <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 800, color: '#1a2e1a', letterSpacing: '-0.01em' }}>
                   {displayName}
                 </p>
               </div>
 
-              {/* Card body: stamps + QR */}
-              <div style={{ position: 'relative', display: 'flex', gap: 16, padding: '16px 18px 18px', alignItems: 'flex-start' }}>
-                {/* Left: stamps + progress */}
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6, marginBottom: 12 }}>
-                    {Array.from({ length: stampsGoal }).map((_, i) => {
-                      const filled = isAuthenticated && !loyaltyLoading && i < stampsCount;
-                      return (
-                        <motion.div
-                          key={i}
-                          initial={false}
-                          animate={filled ? { scale: 1, opacity: 1 } : { scale: 0.88, opacity: 0.5 }}
-                          transition={{ type: 'spring', stiffness: 420, damping: 22, delay: filled ? i * 0.04 : 0 }}
-                          style={{ aspectRatio: '1', borderRadius: '50%', background: filled ? 'linear-gradient(140deg, #c8902a, #d8aa38)' : 'rgba(26,46,26,0.1)', border: filled ? '1px solid rgba(210,160,50,0.5)' : '1.5px solid rgba(26,46,26,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: filled ? '0 2px 6px rgba(180,120,20,0.28)' : 'none' }}
-                        >
-                          {filled && <div style={{ width: '38%', height: '38%', borderRadius: '50%', background: 'rgba(255,245,210,0.65)' }} />}
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
-                    {loyaltyLoading
-                      ? 'Loading…'
-                      : !isAuthenticated
-                        ? `0 of ${stampsGoal} stamps collected`
-                        : `${stampsCount} of ${stampsGoal} stamps collected`}
-                  </p>
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.5)' }}>
-                    {!isAuthenticated
-                      ? 'Sign in to earn stamps on qualifying orders (£3+)'
-                      : loyaltyLoading
-                        ? '…'
-                        : `${stampsToNextReward} until your free coffee ☕`}
-                  </p>
-                  {loyaltyError ? (
-                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: '#b34a2a', marginTop: 8 }}>{loyaltyError}</p>
-                  ) : null}
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.35)', marginTop: 8, fontStyle: 'italic' }}>
-                    Earn stamps when you collect a £3+ order (double on Tuesdays)
-                  </p>
-                  {isAuthenticated && !loyaltyLoading && rewardsAvailable > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => navigate('/rewards')}
-                      style={{
-                        marginTop: 14,
-                        width: '100%',
-                        textAlign: 'center',
-                        fontFamily: 'Fraunces, Georgia, serif',
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: '#1a2e1a',
-                        background: 'rgba(200,144,42,0.15)',
-                        border: '1.5px solid rgba(200,144,42,0.35)',
-                        borderRadius: 14,
-                        padding: '12px 14px',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      {rewardsAvailable} reward{rewardsAvailable === 1 ? '' : 's'} ready — view, use at checkout
-                    </button>
-                  ) : null}
+              {/* Card body: stamps (full width) */}
+              <div style={{ position: 'relative', padding: '16px 18px 20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6, marginBottom: 12 }}>
+                  {Array.from({ length: stampsGoal }).map((_, i) => {
+                    const filled = isAuthenticated && !loyaltyLoading && i < stampsCount;
+                    const pending =
+                      isAuthenticated &&
+                      !loyaltyLoading &&
+                      pendingStampEarnCount > 0 &&
+                      i >= stampsCount &&
+                      i < stampsCount + pendingStampEarnCount;
+                    return (
+                      <motion.div
+                        key={i}
+                        initial={false}
+                        animate={
+                          filled
+                            ? { scale: 1, opacity: 1 }
+                            : pending
+                              ? { scale: 0.94, opacity: 0.88 }
+                              : { scale: 0.88, opacity: 0.5 }
+                        }
+                        transition={{ type: 'spring', stiffness: 420, damping: 22, delay: filled ? i * 0.04 : 0 }}
+                        style={{
+                          aspectRatio: '1',
+                          borderRadius: '50%',
+                          background: filled
+                            ? 'linear-gradient(140deg, #c8902a, #d8aa38)'
+                            : pending
+                              ? 'linear-gradient(145deg, rgba(90,130,90,0.22), rgba(120,160,120,0.28))'
+                              : 'rgba(26,46,26,0.1)',
+                          border: filled
+                            ? '1px solid rgba(210,160,50,0.5)'
+                            : pending
+                              ? '1.5px solid rgba(60,100,60,0.28)'
+                              : '1.5px solid rgba(26,46,26,0.18)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: filled ? '0 2px 6px rgba(180,120,20,0.28)' : pending ? '0 1px 4px rgba(40,80,40,0.12)' : 'none',
+                        }}
+                      >
+                        {filled && <div style={{ width: '38%', height: '38%', borderRadius: '50%', background: 'rgba(255,245,210,0.65)' }} />}
+                      </motion.div>
+                    );
+                  })}
                 </div>
 
-                {/* Right: QR code */}
-                <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <div style={{ background: '#faf2e2', padding: 8, borderRadius: 14, border: '1.5px solid rgba(26,46,26,0.1)', boxShadow: '0 2px 12px rgba(0,0,0,0.1)' }}>
-                    <QRCode size={100} />
-                  </div>
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)', textAlign: 'center' }}>
-                    Show to barista
-                  </p>
-                </div>
+                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
+                  {loyaltyLoading
+                    ? 'Loading…'
+                    : !isAuthenticated
+                      ? `0 of ${stampsGoal} stamps collected`
+                      : `${stampsCount} of ${stampsGoal} stamps collected`}
+                </p>
+
+                {loyaltyError ? (
+                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: '#b34a2a', marginTop: 8 }}>{loyaltyError}</p>
+                ) : null}
+                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.35)', marginTop: 8, fontStyle: 'italic' }}>
+                  Earn stamps when you collect a £2+ app order, watch out for promotions!
+                </p>
+                {isAuthenticated && !loyaltyLoading && rewardsAvailable > 0 ? (
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.985 }}
+                    animate={{ boxShadow: ['0 12px 36px rgba(26,46,26,0.12)', '0 14px 40px rgba(60,100,60,0.14)', '0 12px 36px rgba(26,46,26,0.12)'] }}
+                    transition={{ boxShadow: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' } }}
+                    onClick={() => navigate('/rewards')}
+                    style={{
+                      marginTop: 18,
+                      width: '100%',
+                      textAlign: 'left',
+                      fontFamily: 'Fraunces, Georgia, serif',
+                      fontSize: 18,
+                      fontWeight: 800,
+                      color: '#1a2e1a',
+                      background: 'linear-gradient(165deg, #fffdf8 0%, #f5f0e4 45%, #ebe4d4 100%)',
+                      border: '1px solid rgba(26,46,26,0.1)',
+                      borderRadius: 20,
+                      padding: '22px 20px',
+                      cursor: 'pointer',
+                      boxShadow: '0 12px 36px rgba(26,46,26,0.12), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
+                    }}
+                  >
+                    <span style={{ display: 'block', marginBottom: 6 }}>
+                      {rewardsAvailable} free drink{rewardsAvailable === 1 ? '' : 's'} waiting ☕
+                    </span>
+                    <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 600, color: 'rgba(26,46,26,0.48)' }}>
+                      View rewards → use at checkout
+                    </span>
+                  </motion.button>
+                ) : null}
               </div>
             </div>
           </div>
@@ -800,8 +851,51 @@ export default function Profile() {
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.35)' }}>When you complete an order, it will show up here.</p>
             </div>
           ) : (
+            <>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {[
+                  { id: 'week', label: 'This week' },
+                  { id: 'month', label: 'This month' },
+                  { id: 'all', label: 'All time' },
+                ].map(({ id, label }) => {
+                  const active = ordersHorizon === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setOrdersHorizon(id)}
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: '8px 14px',
+                        borderRadius: 100,
+                        border: active ? '1.5px solid #c8902a' : '1.5px solid #d4c0a0',
+                        background: active ? 'rgba(200,144,42,0.18)' : 'rgba(255,255,255,0.45)',
+                        color: active ? '#1a2e1a' : 'rgba(26,46,26,0.55)',
+                        cursor: 'pointer',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+              {filteredCompletedOrders.length === 0 ? (
+                <div style={{ background: 'rgba(255,255,255,0.4)', border: '1.5px dashed #d4c0a0', borderRadius: 18, padding: '20px 18px', textAlign: 'center' }}>
+                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: 'rgba(26,46,26,0.5)', margin: 0, lineHeight: 1.45 }}>
+                    {ordersHorizon === 'week'
+                      ? 'No orders this week. Try this month or all time.'
+                      : ordersHorizon === 'month'
+                        ? 'No orders this month. Try all time.'
+                        : 'No orders in this range.'}
+                  </p>
+                </div>
+              ) : (
+            <>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {completedOrders.map((order, idx) => (
+              {paginatedCompletedOrders.map((order, idx) => (
                 <motion.div
                   key={order.id}
                   layout
@@ -815,7 +909,7 @@ export default function Profile() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
                       <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(26,46,26,0.07)', border: '1.5px solid #d4c0a0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                         <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 11, fontWeight: 800, color: 'rgba(26,46,26,0.4)' }}>
-                          {completedOrders.length - idx}
+                          {filteredCompletedOrders.length - (ordersPage * ORDERS_PAGE_SIZE + idx)}
                         </span>
                       </div>
                       <div style={{ minWidth: 0 }}>
@@ -873,65 +967,126 @@ export default function Profile() {
                 </motion.div>
               ))}
             </div>
+            {filteredCompletedOrders.length > ORDERS_PAGE_SIZE ? (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginTop: 14,
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
+                <button
+                  type="button"
+                  disabled={ordersPage <= 0}
+                  onClick={() => setOrdersPage((p) => Math.max(0, p - 1))}
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '8px 14px',
+                    borderRadius: 100,
+                    border: '1.5px solid #d4c0a0',
+                    background: ordersPage <= 0 ? 'rgba(26,46,26,0.06)' : 'rgba(255,255,255,0.5)',
+                    color: ordersPage <= 0 ? 'rgba(26,46,26,0.35)' : '#1a2e1a',
+                    cursor: ordersPage <= 0 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Previous
+                </button>
+                <span
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'rgba(26,46,26,0.5)',
+                  }}
+                >
+                  Page {ordersPage + 1} of {ordersPageCount}
+                </span>
+                <button
+                  type="button"
+                  disabled={ordersPage >= ordersPageCount - 1}
+                  onClick={() => setOrdersPage((p) => Math.min(ordersPageCount - 1, p + 1))}
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    padding: '8px 14px',
+                    borderRadius: 100,
+                    border: '1.5px solid #d4c0a0',
+                    background: ordersPage >= ordersPageCount - 1 ? 'rgba(26,46,26,0.06)' : 'rgba(255,255,255,0.5)',
+                    color: ordersPage >= ordersPageCount - 1 ? 'rgba(26,46,26,0.35)' : '#1a2e1a',
+                    cursor: ordersPage >= ordersPageCount - 1 ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+            </>
+              )}
+            </>
           )}
         </motion.section>
 
-        {/* ── PAST EVENTS — with star ratings ─────────────────────── */}
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 28 }}
-        >
-          <SectionHead label="Memories" title="Events you attended" />
+        {/* ── EVENTS YOU ATTENDED (derived from bookings that have passed) ── */}
+        {attendedEvents.length > 0 ? (
+          <motion.section
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 28 }}
+          >
+            <SectionHead label="Memories" title="Events you attended" />
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            {PAST_EVENTS.map((event) => (
-              <div
-                key={event.id}
-                style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 20, padding: '18px 18px 16px' }}
-              >
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                  <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(145deg, #e8e0d0, #d4c8b0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
-                    {event.emoji}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                      <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 15, fontWeight: 700, color: '#1a2e1a' }}>
-                        {event.title}
-                      </p>
-                      <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7a9a78', background: '#d4e8d0', padding: '2px 8px', borderRadius: 100, flexShrink: 0 }}>
-                        ✓ Attended
-                      </span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {attendedEvents.map((event) => (
+                <div
+                  key={event.id}
+                  style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 20, padding: '18px 18px 16px' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(145deg, #e8e0d0, #d4c8b0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                      {event.emoji}
                     </div>
-                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)' }}>
-                      {event.date}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 15, fontWeight: 700, color: '#1a2e1a' }}>
+                          {event.title}
+                        </p>
+                        <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7a9a78', background: '#d4e8d0', padding: '2px 8px', borderRadius: 100, flexShrink: 0 }}>
+                          ✓ Attended
+                        </span>
+                      </div>
+                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)' }}>
+                        {event.date}
+                        {event.time ? ` · ${event.time}` : ''}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12.5, color: 'rgba(26,46,26,0.65)', lineHeight: 1.55, marginBottom: 14 }}>
+                    {event.description}
+                  </p>
+
+                  <div style={{ height: 1, background: 'rgba(26,46,26,0.08)', marginBottom: 12 }} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: ratings[event.id] ? '#c8902a' : 'rgba(26,46,26,0.4)', letterSpacing: '0.02em' }}>
+                      {ratings[event.id] ? 'Your rating' : 'Rate this event'}
                     </p>
+                    <StarRating
+                      value={ratings[event.id] || 0}
+                      onChange={(stars) => handleRate(event.id, stars)}
+                    />
                   </div>
                 </div>
-
-                {/* Description */}
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12.5, color: 'rgba(26,46,26,0.65)', lineHeight: 1.55, marginBottom: 14 }}>
-                  {event.description}
-                </p>
-
-                {/* Divider */}
-                <div style={{ height: 1, background: 'rgba(26,46,26,0.08)', marginBottom: 12 }} />
-
-                {/* Star rating */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: ratings[event.id] ? '#c8902a' : 'rgba(26,46,26,0.4)', letterSpacing: '0.02em' }}>
-                    {ratings[event.id] ? 'Your rating' : 'Rate this event'}
-                  </p>
-                  <StarRating
-                    value={ratings[event.id] || 0}
-                    onChange={(stars) => handleRate(event.id, stars)}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </motion.section>
+              ))}
+            </div>
+          </motion.section>
+        ) : null}
 
       </div>
     </motion.div>
