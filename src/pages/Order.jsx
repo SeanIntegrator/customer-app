@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useBlocker } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import useCatalog from '../hooks/useCatalog';
@@ -9,13 +9,26 @@ import { PAPER_GRAIN_BACKGROUND, orderReadyInOneLine } from '../lib/pickup';
 import MenuItem from '../components/MenuItem';
 import ItemDetailSheet from '../components/ItemDetailSheet';
 import CartDrawer from '../components/CartDrawer';
+import Toast from '../components/Toast';
 
 export default function Order() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, loading: authLoading, authFetch } = useAuth();
   const { items: catalogItems, categories, milkOptions, sizeOptions, syrupOptions, alterationOptions, loading, error } = useCatalog();
-  const { addItem, totalItems, subtotal, editOrderId, loadCartFromOrderEdit, items: cartItems, updateCartLine } = useCart();
+  const {
+    addItem,
+    totalItems,
+    subtotal,
+    editOrderId,
+    addingToOrderId,
+    loadCartFromOrderEdit,
+    items: cartItems,
+    updateCartLine,
+    clearCart,
+    clearEditMode,
+    clearAddingToOrder,
+  } = useCart();
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedItem, setSelectedItem] = useState(null);
   const [cartEditLine, setCartEditLine] = useState(null);
@@ -23,6 +36,23 @@ export default function Order() {
   const [cartBounce, setCartBounce] = useState(false);
   const [serverActiveOrderResolved, setServerActiveOrderResolved] = useState(false);
   const [inProgressPickupIso, setInProgressPickupIso] = useState(null);
+  const [basketToast, setBasketToast] = useState({ message: '', visible: false });
+  const basketToastTimerRef = useRef(null);
+
+  const basketDirty = useMemo(
+    () =>
+      (addingToOrderId != null && cartItems.length > 0) ||
+      (editOrderId != null && cartItems.some((i) => !i.fromExistingOrder)),
+    [addingToOrderId, editOrderId, cartItems]
+  );
+
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    return (
+      basketDirty &&
+      currentLocation.pathname === '/order' &&
+      nextLocation.pathname !== currentLocation.pathname
+    );
+  });
 
   const hasAuthToken =
     typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('auth_token');
@@ -59,6 +89,9 @@ export default function Order() {
         if (editOrderId != null) {
           const o = await fetchCustomerOrder(authFetch, editOrderId);
           if (!cancelled) setInProgressPickupIso(o?.pickup_time ?? null);
+        } else if (addingToOrderId != null) {
+          const o = await fetchCustomerOrder(authFetch, addingToOrderId);
+          if (!cancelled) setInProgressPickupIso(o?.pickup_time ?? null);
         } else {
           const list = await fetchCustomerOrders(authFetch, { status: 'pending,confirmed' });
           if (cancelled) return;
@@ -79,7 +112,7 @@ export default function Order() {
     return () => {
       cancelled = true;
     };
-  }, [authLoading, user, editOrderId, authFetch, loadCartFromOrderEdit]);
+  }, [authLoading, user, editOrderId, addingToOrderId, authFetch, loadCartFromOrderEdit]);
 
   const addToMenuBlocked =
     (authLoading && hasAuthToken) || (!!user && !serverActiveOrderResolved);
@@ -119,11 +152,20 @@ export default function Order() {
 
   const handleAddToCart = (item) => {
     addItem(item);
+    if (editOrderId != null || addingToOrderId != null) {
+      const label = item.name || 'Item';
+      if (basketToastTimerRef.current) window.clearTimeout(basketToastTimerRef.current);
+      setBasketToast({ message: `${label} added to order`, visible: true });
+      basketToastTimerRef.current = window.setTimeout(() => {
+        setBasketToast((s) => ({ ...s, visible: false }));
+        basketToastTimerRef.current = null;
+      }, 3200);
+    }
     setCartBounce(true);
     setTimeout(() => setCartBounce(false), 400);
   };
 
-  const showInProgressBanner = editOrderId != null;
+  const showInProgressBanner = editOrderId != null || addingToOrderId != null;
 
   const goBack = () => {
     if (typeof window !== 'undefined' && window.history.length > 1) {
@@ -354,7 +396,7 @@ export default function Order() {
                       disabled={addToMenuBlocked}
                       basketQty={qtyByCatalogId.get(item.catalogObjectId)?.basket ?? 0}
                       orderedQty={qtyByCatalogId.get(item.catalogObjectId)?.ordered ?? 0}
-                      orderEditMode={editOrderId != null}
+                      orderEditMode={editOrderId != null || addingToOrderId != null}
                     />
                   </motion.div>
                 ))}
@@ -419,7 +461,7 @@ export default function Order() {
                   {totalItems}
                 </span>
                 <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  {editOrderId != null ? 'Update order' : 'View order'}
+                  {addingToOrderId != null ? 'Add-ons' : editOrderId != null ? 'Update order' : 'View order'}
                 </span>
               </div>
               <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
@@ -472,6 +514,102 @@ export default function Order() {
           setCartOpen(false);
         }}
       />
+
+      <Toast
+        message={basketToast.message}
+        visible={basketToast.visible}
+        bottomClassName="bottom-8"
+      />
+
+      <AnimatePresence>
+        {blocker.state === 'blocked' ? (
+          <motion.div
+            key="leave-basket-layer"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[280] flex items-start justify-center pt-[22vh] px-4"
+            style={{ background: 'rgba(8,16,8,0.78)' }}
+            onClick={() => blocker.reset()}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 16, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 12, scale: 0.98 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+              className="w-full max-w-md rounded-3xl p-6 shadow-2xl"
+              style={{ background: '#faf5eb', border: '1.5px solid rgba(26,46,26,0.12)' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3
+                style={{
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: '#1a2e1a',
+                  margin: '0 0 12px',
+                }}
+              >
+                Leave the menu?
+              </h3>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 14,
+                  color: 'rgba(26,46,26,0.6)',
+                  margin: '0 0 20px',
+                  lineHeight: 1.45,
+                }}
+              >
+                Leaving this page will clear your edits to your basket.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => blocker.reset()}
+                  style={{
+                    width: '100%',
+                    padding: '14px 18px',
+                    borderRadius: 16,
+                    border: 'none',
+                    background: '#1a2e1a',
+                    color: '#f0e6d0',
+                    fontFamily: 'Fraunces, Georgia, serif',
+                    fontSize: 17,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Stay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearCart();
+                    clearEditMode();
+                    clearAddingToOrder();
+                    blocker.proceed();
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '12px 18px',
+                    borderRadius: 16,
+                    border: '1.5px solid rgba(26,46,26,0.2)',
+                    background: 'transparent',
+                    color: '#1a2e1a',
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 15,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Leave and clear edits
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </motion.div>
   );
 }

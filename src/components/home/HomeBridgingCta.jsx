@@ -4,11 +4,15 @@ import Steam from './Steam';
 
 const DEFAULT_MILKS = ['Full Fat', 'Regular'];
 
+const MIN_MINUTES_FOR_MODIFY = 5;
+
 export default function HomeBridgingCta({
   bridgingCtaLoading,
   goldCardModel,
   navigate,
   onEditOrderTap,
+  onAddMoreTap,
+  onCancelTap,
 }) {
   return (
     <div style={{ margin: '-42px 18px 0', position: 'relative', zIndex: 10 }}>
@@ -116,6 +120,57 @@ export default function HomeBridgingCta({
                 <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>Total</span>
                 <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 22, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>£{(goldCardModel.total_amount / 100).toFixed(2)}</span>
               </div>
+
+              {goldCardModel.editable &&
+              goldCardModel.pickupMinutes > MIN_MINUTES_FOR_MODIFY &&
+              (onAddMoreTap || (onCancelTap && goldCardModel.is_paid_via_stripe)) ? (
+                <div
+                  onClick={(e) => e.stopPropagation()}
+                  style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}
+                >
+                  {onAddMoreTap ? (
+                    <button
+                      type="button"
+                      onClick={() => onAddMoreTap()}
+                      style={{
+                        flex: '1 1 120px',
+                        padding: '12px 14px',
+                        borderRadius: 14,
+                        border: 'none',
+                        background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 100%)',
+                        color: '#122012',
+                        fontFamily: 'Fraunces, Georgia, serif',
+                        fontSize: 15,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 12px rgba(200,144,42,0.25)',
+                      }}
+                    >
+                      Add more items
+                    </button>
+                  ) : null}
+                  {onCancelTap && goldCardModel.is_paid_via_stripe ? (
+                    <button
+                      type="button"
+                      onClick={() => onCancelTap()}
+                      style={{
+                        flex: '1 1 120px',
+                        padding: '12px 14px',
+                        borderRadius: 14,
+                        border: '1.5px solid rgba(26,46,26,0.2)',
+                        background: 'rgba(255,255,255,0.6)',
+                        color: '#1a2e1a',
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 14,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel order
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
 
               <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: 'rgba(26,46,26,0.35)', textAlign: 'right', marginTop: 8 }}>
                 {goldCardModel.editable ? 'Tap to edit order ›' : 'View details ›'}

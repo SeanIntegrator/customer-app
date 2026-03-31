@@ -24,6 +24,7 @@ export default function ItemDetailSheet({
   const [customerNote, setCustomerNote] = useState('');
 
   const isEdit = Boolean(editCartLine?.cartId);
+  const lockedLineEdit = Boolean(isEdit && editCartLine?.fromExistingOrder);
 
   useEffect(() => {
     if (!item) return;
@@ -59,6 +60,10 @@ export default function ItemDetailSheet({
     if (!item || addDisabled) return;
     const noteTrim = customerNote.trim();
     if (isEdit && onSaveCartLine) {
+      if (editCartLine.fromExistingOrder) {
+        onClose();
+        return;
+      }
       onSaveCartLine({
         cartId: editCartLine.cartId,
         catalogObjectId: item.catalogObjectId,
@@ -207,7 +212,27 @@ export default function ItemDetailSheet({
 
             {/* Body */}
             <div style={{ padding: '24px 20px 32px', overflowY: 'auto' }}>
+              {lockedLineEdit ? (
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: 'rgba(26,46,26,0.65)',
+                    margin: '0 0 20px',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  This item is already on your order and can&apos;t be changed here. Add new items from the menu, then save from your cart.
+                </p>
+              ) : null}
 
+              <div
+                style={{
+                  pointerEvents: lockedLineEdit ? 'none' : 'auto',
+                  opacity: lockedLineEdit ? 0.5 : 1,
+                }}
+              >
               {/* Size picker */}
               {isCoffee && (
                 <div style={{ marginBottom: 20 }}>
@@ -448,31 +473,38 @@ export default function ItemDetailSheet({
                   One moment — loading your order…
                 </p>
               )}
+              </div>
               {/* Add to order */}
               <motion.button
-                whileTap={addDisabled ? {} : { scale: 0.97 }}
-                onClick={handleAdd}
-                disabled={addDisabled}
+                whileTap={addDisabled || lockedLineEdit ? {} : { scale: 0.97 }}
+                onClick={lockedLineEdit ? onClose : handleAdd}
+                disabled={addDisabled && !lockedLineEdit}
                 style={{
                   width: '100%',
-                  background: addDisabled ? 'rgba(26,46,26,0.12)' : 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
-                  color: addDisabled ? 'rgba(26,46,26,0.35)' : '#122012',
+                  background:
+                    addDisabled && !lockedLineEdit
+                      ? 'rgba(26,46,26,0.12)'
+                      : 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                  color: addDisabled && !lockedLineEdit ? 'rgba(26,46,26,0.35)' : '#122012',
                   borderRadius: 22,
                   padding: '18px 24px',
                   border: 'none',
-                  cursor: addDisabled ? 'not-allowed' : 'pointer',
+                  cursor: addDisabled && !lockedLineEdit ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  boxShadow: addDisabled ? 'none' : '0 4px 20px rgba(200,144,42,0.35)',
+                  boxShadow: addDisabled && !lockedLineEdit ? 'none' : '0 4px 20px rgba(200,144,42,0.35)',
+                  marginTop: 8,
                 }}
               >
                 <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                  {addDisabled ? 'Please wait…' : isEdit ? 'Save changes' : 'Add to order'}
+                  {lockedLineEdit ? 'Close' : addDisabled ? 'Please wait…' : isEdit ? 'Save changes' : 'Add to order'}
                 </span>
-                <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
-                  £{(totalPrice / 100).toFixed(2)}
-                </span>
+                {!lockedLineEdit ? (
+                  <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
+                    £{(totalPrice / 100).toFixed(2)}
+                  </span>
+                ) : null}
               </motion.button>
             </div>
           </motion.div>

@@ -15,8 +15,9 @@ function pickupMinutesFromOrder(order) {
 export default function OrderPaymentSuccess() {
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session_id');
+  const incremental = searchParams.get('incremental') === '1';
   const { authFetch, isAuthenticated, loading: authLoading } = useAuth();
-  const { clearCart, setActiveOrder, registerPendingKdsFeedback } = useCart();
+  const { clearCart, setActiveOrder, registerPendingKdsFeedback, clearAddingToOrder } = useCart();
   const navigate = useNavigate();
   const [phase, setPhase] = useState('loading');
   const [order, setOrder] = useState(null);
@@ -50,6 +51,9 @@ export default function OrderPaymentSuccess() {
         if (!clearedRef.current && o.status === 'confirmed') {
           clearedRef.current = true;
           clearCart();
+          if (incremental) {
+            clearAddingToOrder();
+          }
           setActiveOrder({
             dbOrderId: o.id,
             squareOrderId: o.square_order_id,
@@ -75,7 +79,7 @@ export default function OrderPaymentSuccess() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, isAuthenticated, authLoading, authFetch, clearCart, setActiveOrder]);
+  }, [sessionId, incremental, isAuthenticated, authLoading, authFetch, clearCart, clearAddingToOrder, setActiveOrder]);
 
   const handleDone = () => {
     if (order?.id != null && order?.square_order_id) {

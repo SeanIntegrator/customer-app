@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const CartContext = createContext(null);
 
@@ -13,10 +14,13 @@ function normalizeAllergensFromApi(raw) {
 }
 
 export function CartProvider({ children }) {
+  const navigate = useNavigate();
   const [items, setItems] = useState([]);
   const [orderAllergens, setOrderAllergens] = useState([]);
   const [activeOrder, setActiveOrder] = useState(null);
   const [editOrderId, setEditOrderId] = useState(null);
+  /** Pay for add-ons: target DB order id; cart holds only new lines. */
+  const [addingToOrderId, setAddingToOrderId] = useState(null);
   /** Opens the feedback sheet (after KDS marks the matching order complete). */
   const [postCheckoutFeedbackOrderId, setPostCheckoutFeedbackOrderId] = useState(null);
   /** @type {React.MutableRefObject<{ dbOrderId: number, squareOrderId: string }[]>} */
@@ -35,6 +39,11 @@ export function CartProvider({ children }) {
       squareOrderId: String(squareOrderId),
     });
   }, []);
+
+  const editOrderIdRef = useRef(null);
+  const addingToOrderIdRef = useRef(null);
+  editOrderIdRef.current = editOrderId;
+  addingToOrderIdRef.current = addingToOrderId;
 
   const applyKdsOrderCompleted = useCallback(
     (payload) => {
@@ -55,9 +64,34 @@ export function CartProvider({ children }) {
           (incomingDb != null && Number(o.dbOrderId) === Number(incomingDb)) ||
           (sq !== '' && o.squareOrderId === sq)
       );
-      if (idx === -1) return;
-      const [hit] = list.splice(idx, 1);
-      beginPostCheckoutFeedback(hit.dbOrderId);
+
+      let feedbackOrderId = null;
+      if (idx !== -1) {
+        const [hit] = list.splice(idx, 1);
+        feedbackOrderId = hit.dbOrderId;
+      }
+
+      if (incomingDb != null) {
+        const dbN = Number(incomingDb);
+        const ed = editOrderIdRef.current;
+        const ad = addingToOrderIdRef.current;
+        if (ed != null && Number(ed) === dbN) {
+          setEditOrderId(null);
+          setItems([]);
+          setOrderAllergens([]);
+          if (feedbackOrderId == null) feedbackOrderId = dbN;
+        }
+        if (ad != null && Number(ad) === dbN) {
+          setAddingToOrderId(null);
+          setItems([]);
+          setOrderAllergens([]);
+          if (feedbackOrderId == null) feedbackOrderId = dbN;
+        }
+      }
+
+      if (feedbackOrderId != null) {
+        beginPostCheckoutFeedback(feedbackOrderId);
+      }
     },
     [beginPostCheckoutFeedback]
   );
@@ -91,20 +125,24 @@ export function CartProvider({ children }) {
   );
 
   const removeItem = useCallback((cartId) => {
-    setItems((prev) => prev.filter((i) => i.cartId !== cartId));
+    setItems((prev) => prev.filter((i) => i.cartId !== cartId || i.fromExistingOrder));
   }, []);
 
   const updateQuantity = useCallback((cartId, delta) => {
     setItems((prev) =>
       prev
-        .map((i) => (i.cartId === cartId ? { ...i, quantity: i.quantity + delta } : i))
+        .map((i) => {
+          if (i.cartId !== cartId) return i;
+          if (i.fromExistingOrder) return i;
+          return { ...i, quantity: i.quantity + delta };
+        })
         .filter((i) => i.quantity > 0)
     );
   }, []);
 
   const updateCartLine = useCallback((cartId, updates) => {
     setItems((prev) =>
-      prev.map((i) => (i.cartId === cartId ? { ...i, ...updates } : i))
+      prev.map((i) => (i.cartId === cartId && !i.fromExistingOrder ? { ...i, ...updates } : i))
     );
   }, []);
 
@@ -116,6 +154,7 @@ export function CartProvider({ children }) {
   /** Pre-fill cart from API order shape; opening menu to add more items before PATCH checkout. */
   const loadCartFromOrderEdit = useCallback((apiOrder) => {
     if (!apiOrder?.id) return;
+    setAddingToOrderId(null);
     setEditOrderId(apiOrder.id);
     setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
     setItems(
@@ -150,9 +189,26 @@ export function CartProvider({ children }) {
     setOrderAllergens([]);
   }, []);
 
+  const startAddingToOrder = useCallback(
+    (orderId) => {
+      if (orderId == null) return;
+      setEditOrderId(null);
+      setAddingToOrderId(Number(orderId));
+      setItems([]);
+      setOrderAllergens([]);
+      navigate('/order');
+    },
+    [navigate]
+  );
+
+  const clearAddingToOrder = useCallback(() => {
+    setAddingToOrderId(null);
+  }, []);
+
   /** Replace cart with lines (e.g. usual order); clears edit mode. */
   const replaceCartLines = useCallback((lines, opts = {}) => {
     setEditOrderId(null);
+    setAddingToOrderId(null);
     setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
     setItems(Array.isArray(lines) ? lines : []);
   }, []);
@@ -180,6 +236,9 @@ export function CartProvider({ children }) {
         setEditOrderId,
         loadCartFromOrderEdit,
         clearEditMode,
+        addingToOrderId,
+        startAddingToOrder,
+        clearAddingToOrder,
         replaceCartLines,
         postCheckoutFeedbackOrderId,
         beginPostCheckoutFeedback,

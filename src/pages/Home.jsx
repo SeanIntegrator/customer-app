@@ -7,6 +7,8 @@ import { useAuth } from '../context/AuthContext';
 import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
 import { remainingMinutesUntilPickup } from '../lib/pickup';
 import EditOrderModal from '../components/EditOrderModal';
+import CancellationModal from '../components/CancellationModal';
+import OrderCancelledSuccess from '../components/OrderCancelledSuccess';
 import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
 import HomeHero from '../components/home/HomeHero';
 import HomeBridgingCta from '../components/home/HomeBridgingCta';
@@ -17,7 +19,7 @@ import { getCafeSocket } from '../lib/cafeSocket';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { activeOrder, loadCartFromOrderEdit } = useCart();
+  const { activeOrder, loadCartFromOrderEdit, startAddingToOrder } = useCart();
   const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
   const [events, setEvents] = useState(EVENTS);
   const [showPast, setShowPast] = useState(false);
@@ -27,6 +29,8 @@ export default function Home() {
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [editOrderOpen, setEditOrderOpen] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState(null);
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancelSuccess, setCancelSuccess] = useState({ open: false, refundedPence: 0 });
 
   const hasAuthToken =
     typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('auth_token');
@@ -92,6 +96,7 @@ export default function Home() {
           milk: 'Full Fat',
         })),
         editable: serverLiveOrder.status === 'pending' || serverLiveOrder.status === 'confirmed',
+        is_paid_via_stripe: Boolean(serverLiveOrder.is_paid_via_stripe),
       };
     }
     if (activeOrder && (activeOrder.orderId != null || activeOrder.dbOrderId != null)) {
@@ -103,6 +108,7 @@ export default function Home() {
         pickupMinutes: activeOrder.pickupMinutes ?? 10,
         items: activeOrder.items || [],
         editable: true,
+        is_paid_via_stripe: true,
       };
     }
     return null;
@@ -164,6 +170,21 @@ export default function Home() {
           setEditingOrderId(id);
           setEditOrderOpen(true);
         }}
+        onAddMoreTap={async () => {
+          if (goldCardModel?.id == null) return;
+          try {
+            if (goldCardModel.is_paid_via_stripe) {
+              startAddingToOrder(goldCardModel.id);
+              return;
+            }
+            const o = await fetchCustomerOrder(authFetch, goldCardModel.id);
+            loadCartFromOrderEdit(o);
+            navigate('/order');
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+        onCancelTap={() => setCancelModalOpen(true)}
       />
 
       <div style={{ padding: '48px 18px 60px' }}>
@@ -208,7 +229,11 @@ export default function Home() {
           if (editingOrderId == null) return;
           try {
             const o = await fetchCustomerOrder(authFetch, editingOrderId);
-            loadCartFromOrderEdit(o);
+            if (o.is_paid_via_stripe) {
+              startAddingToOrder(editingOrderId);
+            } else {
+              loadCartFromOrderEdit(o);
+            }
             setEditOrderOpen(false);
             setEditingOrderId(null);
             navigate('/order');
@@ -217,6 +242,62 @@ export default function Home() {
           }
         }}
       />
+
+      <CancellationModal
+        open={cancelModalOpen && goldCardModel != null}
+        onClose={() => setCancelModalOpen(false)}
+        authFetch={authFetch}
+        order={
+          goldCardModel
+            ? {
+                id: goldCardModel.id,
+                total_amount: goldCardModel.total_amount,
+              }
+            : null
+        }
+        onCancelled={async (data) => {
+          await refreshLiveOrder();
+          const pence = data?.refunded_amount;
+          if (pence != null && Number.isFinite(Number(pence))) {
+            setCancelSuccess({ open: true, refundedPence: Number(pence) });
+          }
+        }}
+      />
+
+      <AnimatePresence>
+        {cancelSuccess.open && (
+          <>
+            <motion.div
+              key="cancel-success-backdrop"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => {
+                setCancelSuccess({ open: false, refundedPence: 0 });
+                navigate('/');
+              }}
+              className="fixed inset-0 sheet-backdrop z-[200]"
+            />
+            <motion.div
+              key="cancel-success-sheet"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 350, damping: 38 }}
+              className="fixed bottom-0 left-0 right-0 rounded-t-3xl z-[210] h-[70vh] flex flex-col"
+              style={{ background: '#f0e6d0', overflow: 'hidden' }}
+            >
+              <OrderCancelledSuccess
+                refundedAmountPence={cancelSuccess.refundedPence}
+                onDone={() => {
+                  setCancelSuccess({ open: false, refundedPence: 0 });
+                  navigate('/');
+                }}
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }

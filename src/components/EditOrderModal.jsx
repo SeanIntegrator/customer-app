@@ -33,6 +33,7 @@ export default function EditOrderModal({
   const [lines, setLines] = useState([]);
   const [status, setStatus] = useState('');
   const [updateSuccess, setUpdateSuccess] = useState(false);
+  const [isPaidViaStripe, setIsPaidViaStripe] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -52,7 +53,10 @@ export default function EditOrderModal({
   }, [open]);
 
   useEffect(() => {
-    if (!open) setUpdateSuccess(false);
+    if (!open) {
+      setUpdateSuccess(false);
+      setIsPaidViaStripe(false);
+    }
   }, [open]);
 
   useEffect(() => {
@@ -65,6 +69,7 @@ export default function EditOrderModal({
       try {
         const o = await fetchCustomerOrder(authFetch, orderId);
         if (cancelled) return;
+        setIsPaidViaStripe(Boolean(o.is_paid_via_stripe));
         const ag = Array.isArray(o.allergens) ? o.allergens.map((x) => String(x).trim()).filter(Boolean) : [];
         setAllergens(ag);
         setAllergyToggle(ag.length > 0);
@@ -294,6 +299,32 @@ export default function EditOrderModal({
                     )}
                     {!loading && editable && (
                       <>
+                        {isPaidViaStripe && (
+                          <div
+                            style={{
+                              marginBottom: 14,
+                              padding: '12px 14px',
+                              borderRadius: 14,
+                              background: 'rgba(200,144,42,0.14)',
+                              border: '1.5px solid rgba(200,144,42,0.35)',
+                            }}
+                          >
+                            <p
+                              style={{
+                                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 600,
+                                color: '#1a2e1a',
+                                margin: 0,
+                                lineHeight: 1.45,
+                              }}
+                            >
+                              This order was paid online. To add drinks or food, use{' '}
+                              <strong>Add more items</strong> so we can charge only the new items. Pickup time and line
+                              items cannot be changed here.
+                            </p>
+                          </div>
+                        )}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, minHeight: 80 }}>
                           {lines.length === 0 && (
                             <p
@@ -333,6 +364,7 @@ export default function EditOrderModal({
                                       margin: 0,
                                     }}
                                   >
+                                    {l.quantity > 1 ? `${l.quantity}× ` : ''}
                                     {l.item_name}
                                   </p>
                                   <p
@@ -346,143 +378,221 @@ export default function EditOrderModal({
                                     £{(l.unit_price / 100).toFixed(2)} ea.
                                   </p>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <button type="button" onClick={() => bumpQty(l.key, -1)} style={stepperBtn}>
-                                    −
-                                  </button>
-                                  <span
-                                    style={{
-                                      fontFamily: 'Fraunces, Georgia, serif',
-                                      fontSize: 15,
-                                      fontWeight: 700,
-                                      width: 18,
-                                      textAlign: 'center',
-                                    }}
-                                  >
-                                    {l.quantity}
-                                  </span>
-                                  <button type="button" onClick={() => bumpQty(l.key, 1)} style={stepperBtn}>
-                                    +
-                                  </button>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => removeLine(l.key)}
+                                {!isPaidViaStripe ? (
+                                  <>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                      <button type="button" onClick={() => bumpQty(l.key, -1)} style={stepperBtn}>
+                                        −
+                                      </button>
+                                      <span
+                                        style={{
+                                          fontFamily: 'Fraunces, Georgia, serif',
+                                          fontSize: 15,
+                                          fontWeight: 700,
+                                          width: 18,
+                                          textAlign: 'center',
+                                        }}
+                                      >
+                                        {l.quantity}
+                                      </span>
+                                      <button type="button" onClick={() => bumpQty(l.key, 1)} style={stepperBtn}>
+                                        +
+                                      </button>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeLine(l.key)}
+                                      style={{
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#b34a2a',
+                                        fontSize: 12,
+                                        fontWeight: 600,
+                                        cursor: 'pointer',
+                                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                      }}
+                                    >
+                                      Remove
+                                    </button>
+                                  </>
+                                ) : null}
+                              </div>
+                              {!isPaidViaStripe ? (
+                                <textarea
+                                  value={l.customer_note || ''}
+                                  onChange={(e) => setLineCustomerNote(l.key, e.target.value)}
+                                  placeholder="Note for this item (optional)"
+                                  rows={2}
                                   style={{
-                                    background: 'none',
-                                    border: 'none',
-                                    color: '#b34a2a',
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    cursor: 'pointer',
+                                    width: '100%',
+                                    boxSizing: 'border-box',
+                                    marginTop: 8,
+                                    padding: '8px 10px',
+                                    borderRadius: 12,
+                                    border: '1.5px solid #e8dcc8',
                                     fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                    fontSize: 12,
+                                    resize: 'none',
+                                  }}
+                                />
+                              ) : l.customer_note ? (
+                                <p
+                                  style={{
+                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                    fontSize: 12,
+                                    fontStyle: 'italic',
+                                    color: 'rgba(26,46,26,0.5)',
+                                    margin: '8px 0 0',
                                   }}
                                 >
-                                  Remove
-                                </button>
-                              </div>
-                              <textarea
-                                value={l.customer_note || ''}
-                                onChange={(e) => setLineCustomerNote(l.key, e.target.value)}
-                                placeholder="Note for this item (optional)"
-                                rows={2}
-                                style={{
-                                  width: '100%',
-                                  boxSizing: 'border-box',
-                                  marginTop: 8,
-                                  padding: '8px 10px',
-                                  borderRadius: 12,
-                                  border: '1.5px solid #e8dcc8',
-                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                                  fontSize: 12,
-                                  resize: 'none',
-                                }}
-                              />
+                                  Note: {l.customer_note}
+                                </p>
+                              ) : null}
                             </div>
                           ))}
                         </div>
 
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: 'rgba(255,255,255,0.35)',
-                            border: '1.5px solid #e0d0b0',
-                            borderRadius: 16,
-                            padding: '12px 16px',
-                            marginBottom: 10,
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontFamily: 'Plus Jakarta Sans, sans-serif',
-                              fontSize: 14,
-                              fontWeight: 600,
-                              color: '#1a2e1a',
-                            }}
-                          >
-                            Do you have any allergies?
-                          </span>
-                          <button
-                            type="button"
-                            role="switch"
-                            aria-checked={allergyToggle}
-                            onClick={() => {
-                              setAllergyToggle((v) => !v);
-                              if (allergyToggle) setAllergens([]);
-                            }}
-                            style={{
-                              width: 48,
-                              height: 28,
-                              borderRadius: 999,
-                              border: 'none',
-                              cursor: 'pointer',
-                              background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
-                              position: 'relative',
-                              flexShrink: 0,
-                            }}
-                          >
-                            <span
+                        {!isPaidViaStripe ? (
+                          <>
+                            <div
                               style={{
-                                position: 'absolute',
-                                top: 3,
-                                left: allergyToggle ? 24 : 3,
-                                width: 22,
-                                height: 22,
-                                borderRadius: '50%',
-                                background: '#f0e6d0',
-                                transition: 'left 0.15s ease',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(255,255,255,0.35)',
+                                border: '1.5px solid #e0d0b0',
+                                borderRadius: 16,
+                                padding: '12px 16px',
+                                marginBottom: 10,
                               }}
-                            />
-                          </button>
-                        </div>
-                        {allergyToggle && (
-                          <div style={{ marginBottom: 16 }}>
-                            <AllergyChipsInput value={allergens} onChange={setAllergens} />
-                          </div>
-                        )}
+                            >
+                              <span
+                                style={{
+                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  fontSize: 14,
+                                  fontWeight: 600,
+                                  color: '#1a2e1a',
+                                }}
+                              >
+                                Do you have any allergies?
+                              </span>
+                              <button
+                                type="button"
+                                role="switch"
+                                aria-checked={allergyToggle}
+                                onClick={() => {
+                                  setAllergyToggle((v) => !v);
+                                  if (allergyToggle) setAllergens([]);
+                                }}
+                                style={{
+                                  width: 48,
+                                  height: 28,
+                                  borderRadius: 999,
+                                  border: 'none',
+                                  cursor: 'pointer',
+                                  background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
+                                  position: 'relative',
+                                  flexShrink: 0,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    position: 'absolute',
+                                    top: 3,
+                                    left: allergyToggle ? 24 : 3,
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: '50%',
+                                    background: '#f0e6d0',
+                                    transition: 'left 0.15s ease',
+                                  }}
+                                />
+                              </button>
+                            </div>
+                            {allergyToggle && (
+                              <div style={{ marginBottom: 16 }}>
+                                <AllergyChipsInput value={allergens} onChange={setAllergens} />
+                              </div>
+                            )}
 
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            background: 'rgba(255,255,255,0.5)',
-                            border: '1.5px solid #e0d0b0',
-                            borderRadius: 16,
-                            padding: '12px 16px',
-                            marginBottom: 8,
-                          }}
-                        >
-                          <div>
+                            <div
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                background: 'rgba(255,255,255,0.5)',
+                                border: '1.5px solid #e0d0b0',
+                                borderRadius: 16,
+                                padding: '12px 16px',
+                                marginBottom: 8,
+                              }}
+                            >
+                              <div>
+                                <p
+                                  style={{
+                                    fontFamily: 'Fraunces, Georgia, serif',
+                                    fontSize: 15,
+                                    fontWeight: 700,
+                                    color: '#1a2e1a',
+                                    margin: 0,
+                                  }}
+                                >
+                                  Pickup
+                                </p>
+                                <p
+                                  style={{
+                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                    fontSize: 12,
+                                    color: 'rgba(26,46,26,0.45)',
+                                    margin: '4px 0 0',
+                                  }}
+                                >
+                                  {pickupMinutes === 0 ? 'ASAP' : formatPickupTimeShort(pickupMinutes)}
+                                </p>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => adjustPickup(-PICKUP_STEP)}
+                                  disabled={pickupMinutes === 0}
+                                  style={{ ...stepperBtn, opacity: pickupMinutes === 0 ? 0.35 : 1 }}
+                                >
+                                  −
+                                </button>
+                                <span
+                                  style={{
+                                    fontFamily: 'Fraunces, Georgia, serif',
+                                    fontWeight: 700,
+                                    fontSize: 14,
+                                    minWidth: 36,
+                                    textAlign: 'center',
+                                  }}
+                                >
+                                  {pickupMinutes === 0 ? 'ASAP' : `${pickupMinutes}m`}
+                                </span>
+                                <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        ) : (
+                          <div
+                            style={{
+                              background: 'rgba(255,255,255,0.45)',
+                              border: '1.5px solid #e0d0b0',
+                              borderRadius: 16,
+                              padding: '12px 16px',
+                              marginBottom: 8,
+                            }}
+                          >
                             <p
                               style={{
                                 fontFamily: 'Fraunces, Georgia, serif',
                                 fontSize: 15,
                                 fontWeight: 700,
                                 color: '#1a2e1a',
-                                margin: 0,
+                                margin: '0 0 6px',
                               }}
                             >
                               Pickup
@@ -490,39 +600,36 @@ export default function EditOrderModal({
                             <p
                               style={{
                                 fontFamily: 'Plus Jakarta Sans, sans-serif',
-                                fontSize: 12,
-                                color: 'rgba(26,46,26,0.45)',
-                                margin: '4px 0 0',
+                                fontSize: 13,
+                                color: 'rgba(26,46,26,0.55)',
+                                margin: 0,
                               }}
                             >
                               {pickupMinutes === 0 ? 'ASAP' : formatPickupTimeShort(pickupMinutes)}
                             </p>
-                          </div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            <button
-                              type="button"
-                              onClick={() => adjustPickup(-PICKUP_STEP)}
-                              disabled={pickupMinutes === 0}
-                              style={{ ...stepperBtn, opacity: pickupMinutes === 0 ? 0.35 : 1 }}
-                            >
-                              −
-                            </button>
-                            <span
+                            <p
                               style={{
                                 fontFamily: 'Fraunces, Georgia, serif',
+                                fontSize: 15,
                                 fontWeight: 700,
-                                fontSize: 14,
-                                minWidth: 36,
-                                textAlign: 'center',
+                                color: '#1a2e1a',
+                                margin: '14px 0 6px',
                               }}
                             >
-                              {pickupMinutes === 0 ? 'ASAP' : `${pickupMinutes}m`}
-                            </span>
-                            <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>
-                              +
-                            </button>
+                              Allergies
+                            </p>
+                            <p
+                              style={{
+                                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                fontSize: 13,
+                                color: 'rgba(26,46,26,0.55)',
+                                margin: 0,
+                              }}
+                            >
+                              {allergens.length ? allergens.join(', ') : 'None listed'}
+                            </p>
                           </div>
-                        </div>
+                        )}
                       </>
                     )}
                   </div>
@@ -598,34 +705,36 @@ export default function EditOrderModal({
                           fontSize: 18,
                           fontWeight: 800,
                           cursor: 'pointer',
-                          marginBottom: 12,
+                          marginBottom: isPaidViaStripe ? 0 : 12,
                           boxShadow: '0 4px 20px rgba(200,144,42,0.35)',
                         }}
                       >
                         Add more items →
                       </motion.button>
 
-                      <motion.button
-                        type="button"
-                        whileTap={{ scale: 0.98 }}
-                        onClick={handleSave}
-                        disabled={saving || lines.length === 0}
-                        style={{
-                          width: '100%',
-                          background: '#1a2e1a',
-                          color: '#f0e6d0',
-                          borderRadius: 20,
-                          padding: '16px 20px',
-                          border: 'none',
-                          fontFamily: 'Fraunces, Georgia, serif',
-                          fontSize: 18,
-                          fontWeight: 800,
-                          cursor: saving || lines.length === 0 ? 'not-allowed' : 'pointer',
-                          opacity: saving || lines.length === 0 ? 0.55 : 1,
-                        }}
-                      >
-                        {saving ? 'Saving…' : 'Save changes'}
-                      </motion.button>
+                      {!isPaidViaStripe ? (
+                        <motion.button
+                          type="button"
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleSave}
+                          disabled={saving || lines.length === 0}
+                          style={{
+                            width: '100%',
+                            background: '#1a2e1a',
+                            color: '#f0e6d0',
+                            borderRadius: 20,
+                            padding: '16px 20px',
+                            border: 'none',
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 18,
+                            fontWeight: 800,
+                            cursor: saving || lines.length === 0 ? 'not-allowed' : 'pointer',
+                            opacity: saving || lines.length === 0 ? 0.55 : 1,
+                          }}
+                        >
+                          {saving ? 'Saving…' : 'Save changes'}
+                        </motion.button>
+                      ) : null}
                     </div>
                   )}
                 </div>

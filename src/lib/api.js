@@ -38,6 +38,31 @@ export async function fetchCatalogItems() {
   return data.items ?? [];
 }
 
+export async function createIncrementalCheckoutSession(authFetch, body) {
+  const res = await authFetch(`${BASE}/api/stripe/create-incremental-checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || data.reason || 'Could not start add-on checkout');
+  }
+  return { sessionId: data.sessionId, url: data.url, difference: data.difference };
+}
+
+export async function cancelCustomerOrder(authFetch, orderId) {
+  const res = await authFetch(`${BASE}/api/customer/orders/${encodeURIComponent(orderId)}/cancel`, {
+    method: 'POST',
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    const err = new Error(data.error || data.reason || 'Could not cancel order');
+    throw err;
+  }
+  return data;
+}
+
 export async function createCheckoutSession(authFetch, body) {
   const res = await authFetch(`${BASE}/api/stripe/create-checkout-session`, {
     method: 'POST',

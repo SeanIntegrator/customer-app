@@ -1,10 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { loadStripe } from '@stripe/stripe-js';
-import { createCheckoutSession, orderLineItemsFromCartItems, updateCustomerOrder } from '../lib/api';
+import {
+  createCheckoutSession,
+  createIncrementalCheckoutSession,
+  fetchCustomerOrder,
+  orderLineItemsFromCartItems,
+  updateCustomerOrder,
+} from '../lib/api';
 import OrderSuccess from './OrderSuccess';
 import SignInButton from './SignInButton';
 import AllergyChipsInput from './AllergyChipsInput';
@@ -19,6 +25,27 @@ import {
 } from '../lib/pickup';
 
 const stepperBtn = checkoutStepperButtonStyle;
+
+function lineMetaCaption(item) {
+  return (
+    [
+      item.size !== 'Regular' && item.size,
+      !['Full Fat', 'Regular'].includes(item.milk) && item.milk,
+      item.syrup && `${item.syrup} syrup`,
+      ...(item.alterations ?? []),
+    ].filter(Boolean).join(', ') || (item.category === 'coffee' ? 'Regular' : null)
+  );
+}
+
+const sectionLabelStyle = {
+  fontFamily: 'Plus Jakarta Sans, sans-serif',
+  fontSize: 11,
+  fontWeight: 700,
+  letterSpacing: '0.14em',
+  textTransform: 'uppercase',
+  color: 'rgba(26,46,26,0.45)',
+  margin: '0 0 8px',
+};
 
 function PenIcon() {
   return (
@@ -42,6 +69,8 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     registerPendingKdsFeedback,
     orderAllergens,
     setOrderAllergens,
+    addingToOrderId,
+    clearAddingToOrder,
   } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
   const [submitting, setSubmitting] = useState(false);
@@ -51,10 +80,30 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
   const [pickupMinutes, setPickupMinutes] = useState(DEFAULT_PICKUP_MINUTES);
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
   const [allergyToggle, setAllergyToggle] = useState(false);
+  const [lockedOrder, setLockedOrder] = useState(null);
 
   useEffect(() => {
     if (isAuthenticated) setShowCheckoutSignIn(false);
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!open || addingToOrderId == null || !isAuthenticated) {
+      setLockedOrder(null);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const o = await fetchCustomerOrder(authFetch, addingToOrderId);
+        if (!cancelled) setLockedOrder(o);
+      } catch {
+        if (!cancelled) setLockedOrder(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, addingToOrderId, isAuthenticated, authFetch]);
 
   useEffect(() => {
     if (!open) {
@@ -66,6 +115,21 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
   useEffect(() => {
     if (open && orderAllergens.length > 0) setAllergyToggle(true);
   }, [open, orderAllergens.length]);
+
+  const isUpdateEditMode = editOrderId != null && addingToOrderId == null;
+  const tallSheet = !orderSuccess && (editOrderId != null || addingToOrderId != null);
+  const existingItems = useMemo(() => items.filter((i) => i.fromExistingOrder), [items]);
+  const newItems = useMemo(() => items.filter((i) => !i.fromExistingOrder), [items]);
+  const existingSubtotal = useMemo(
+    () => existingItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0),
+    [existingItems]
+  );
+  const newSubtotal = useMemo(() => newItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0), [newItems]);
+
+  const handleSheetClose = () => {
+    clearAddingToOrder();
+    onClose();
+  };
 
   const adjustPickup = (delta) => {
     setPickupMinutes((m) => adjustPickupStepper(m, delta));
@@ -98,7 +162,29 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
     };
 
     try {
-      if (editOrderId != null) {
+      if (addingToOrderId != null) {
+        const pubKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY;
+        if (!pubKey) {
+          setError('Checkout is not configured (missing VITE_STRIPE_PUBLISHABLE_KEY).');
+        } else {
+          const { sessionId, url } = await createIncrementalCheckoutSession(authFetch, {
+            order_id: addingToOrderId,
+            additional_line_items: orderLineItemsFromCartItems(items),
+          });
+          const stripe = await loadStripe(pubKey);
+          if (!stripe) {
+            throw new Error('Stripe.js failed to load');
+          }
+          const { error: stripeErr } = await stripe.redirectToCheckout({ sessionId });
+          if (stripeErr) {
+            if (url) {
+              window.location.assign(url);
+              return;
+            }
+            throw new Error(stripeErr.message || 'Could not redirect to payment');
+          }
+        }
+      } else if (editOrderId != null) {
         setOrderSuccessVariant('updated');
         const updated = await updateCustomerOrder(authFetch, editOrderId, {
           customer_name: user.displayName,
@@ -161,7 +247,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
         squareOrderId: activeOrder.squareOrderId,
       });
     }
-    onClose();
+    handleSheetClose();
     setPickupMinutes(DEFAULT_PICKUP_MINUTES);
     navigate('/');
   };
@@ -174,7 +260,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => !orderSuccess && onClose()}
+            onClick={() => !orderSuccess && handleSheetClose()}
             className="fixed inset-0 sheet-backdrop z-40"
           />
 
@@ -183,7 +269,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 350, damping: 38 }}
-            className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : 'max-h-[90vh]'}`}
+            className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : tallSheet ? 'h-[90vh] max-h-[90vh]' : 'max-h-[90vh]'}`}
             style={{ background: '#f0e6d0', overflow: 'hidden' }}
           >
             {orderSuccess ? (
@@ -227,11 +313,11 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                       margin: 0,
                       letterSpacing: '-0.02em',
                     }}>
-                      {editOrderId != null ? 'Update order' : 'Your order'}
+                      {addingToOrderId != null ? 'Add to order' : editOrderId != null ? 'Update order' : 'Your order'}
                     </h2>
                     <button
                       type="button"
-                      onClick={onClose}
+                      onClick={handleSheetClose}
                       style={{
                         width: 32,
                         height: 32,
@@ -253,12 +339,301 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                 </div>
 
                 <div className="flex-1 overflow-y-auto scrollbar-hide min-h-0" style={{ padding: '12px 20px' }}>
-                  {items.length === 0 ? (
+                  {isUpdateEditMode ? (
+                    <>
+                      <p style={{ ...sectionLabelStyle, marginBottom: 10 }}>Already on your order</p>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 18 }}>
+                        {existingItems.map((item) => (
+                          <motion.div
+                            key={item.cartId}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            style={{
+                              opacity: 0.75,
+                              background: '#e4dfd4',
+                              border: '1.5px solid rgba(26,46,26,0.16)',
+                              borderRadius: 18,
+                              padding: '14px 16px',
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              gap: 12,
+                            }}
+                          >
+                            <span style={{ fontSize: 28, flexShrink: 0 }}>{item.emoji}</span>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <p
+                                style={{
+                                  fontFamily: 'Fraunces, Georgia, serif',
+                                  fontSize: 14,
+                                  fontWeight: 700,
+                                  color: 'rgba(26,46,26,0.75)',
+                                  lineHeight: 1.3,
+                                  margin: 0,
+                                }}
+                              >
+                                {item.quantity > 1 ? `${item.quantity}× ` : ''}
+                                {item.name}
+                              </p>
+                              <p
+                                style={{
+                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  fontSize: 11,
+                                  color: 'rgba(26,46,26,0.4)',
+                                  margin: '4px 0 0',
+                                }}
+                              >
+                                {lineMetaCaption(item)}
+                              </p>
+                              {item.customerNote ? (
+                                <p
+                                  style={{
+                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                    fontSize: 11,
+                                    fontStyle: 'italic',
+                                    color: 'rgba(26,46,26,0.45)',
+                                    margin: '4px 0 0',
+                                  }}
+                                >
+                                  {item.customerNote}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                              <p
+                                style={{
+                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                  color: 'rgba(26,46,26,0.55)',
+                                  margin: 0,
+                                }}
+                              >
+                                £{((item.totalPrice * item.quantity) / 100).toFixed(2)}
+                              </p>
+                              <p
+                                style={{
+                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                  fontSize: 10,
+                                  color: 'rgba(26,46,26,0.35)',
+                                  margin: '4px 0 0',
+                                }}
+                              >
+                                Paid / on order
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                      <p style={{ ...sectionLabelStyle, marginBottom: 10 }}>Adding to order</p>
+                      {newItems.length === 0 ? (
+                        <p
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 14,
+                            color: 'rgba(26,46,26,0.5)',
+                            margin: '0 0 12px',
+                            lineHeight: 1.45,
+                          }}
+                        >
+                          Add items from the menu, then open the cart again to save everything together.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                          {newItems.map((item) => (
+                            <motion.div
+                              key={item.cartId}
+                              initial={{ opacity: 0, y: 8 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, x: -20 }}
+                              style={{
+                                background: 'linear-gradient(148deg, #fef9f0 0%, #f5ead8 100%)',
+                                border: '1.5px solid #e0d0b0',
+                                borderRadius: 18,
+                                padding: '14px 16px',
+                                display: 'flex',
+                                alignItems: 'flex-start',
+                                gap: 12,
+                              }}
+                            >
+                              <span style={{ fontSize: 30, flexShrink: 0 }}>{item.emoji}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, minWidth: 0 }}>
+                                  <p
+                                    style={{
+                                      fontFamily: 'Fraunces, Georgia, serif',
+                                      fontSize: 14,
+                                      fontWeight: 700,
+                                      color: '#1a2e1a',
+                                      lineHeight: 1.3,
+                                      margin: 0,
+                                      flex: 1,
+                                      minWidth: 0,
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 3,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    {item.name}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    aria-label={`Edit ${item.name}`}
+                                    onClick={() => onEditLine?.(item)}
+                                    style={{
+                                      flexShrink: 0,
+                                      width: 32,
+                                      height: 32,
+                                      borderRadius: 10,
+                                      border: '1.5px solid #d4c0a0',
+                                      background: 'rgba(255,255,255,0.6)',
+                                      color: '#1a2e1a',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'center',
+                                      cursor: 'pointer',
+                                    }}
+                                  >
+                                    <PenIcon />
+                                  </button>
+                                </div>
+                                <p
+                                  style={{
+                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                    fontSize: 11,
+                                    color: 'rgba(26,46,26,0.45)',
+                                    margin: '4px 0 0',
+                                  }}
+                                >
+                                  {lineMetaCaption(item)}
+                                </p>
+                                {item.customerNote ? (
+                                  <p
+                                    style={{
+                                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                      fontSize: 11,
+                                      fontStyle: 'italic',
+                                      color: 'rgba(26,46,26,0.55)',
+                                      margin: '4px 0 0',
+                                    }}
+                                  >
+                                    {item.customerNote}
+                                  </p>
+                                ) : null}
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <button type="button" onClick={() => updateQuantity(item.cartId, -1)} style={stepperBtn}>
+                                    −
+                                  </button>
+                                  <span
+                                    style={{
+                                      fontFamily: 'Fraunces, Georgia, serif',
+                                      fontSize: 15,
+                                      fontWeight: 700,
+                                      color: '#1a2e1a',
+                                      width: 18,
+                                      textAlign: 'center',
+                                    }}
+                                  >
+                                    {item.quantity}
+                                  </span>
+                                  <button type="button" onClick={() => updateQuantity(item.cartId, 1)} style={stepperBtn}>
+                                    +
+                                  </button>
+                                </div>
+                                <p
+                                  style={{
+                                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                    fontSize: 13,
+                                    fontWeight: 600,
+                                    color: '#c8902a',
+                                    margin: 0,
+                                  }}
+                                >
+                                  £{(item.totalPrice / 100).toFixed(2)} ea.
+                                </p>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+
+                  {!isUpdateEditMode && addingToOrderId != null ? (
+                    <div style={{ marginBottom: 14 }}>
+                      <p style={sectionLabelStyle}>
+                        Already ordered
+                      </p>
+                      {!lockedOrder ? (
+                        <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: 'rgba(26,46,26,0.5)' }}>
+                          Loading your order…
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                          {(lockedOrder.items || []).map((it, i) => {
+                            const modStr = Array.isArray(it.modifiers)
+                              ? it.modifiers.map((m) => (m && typeof m === 'object' ? m.name : m)).filter(Boolean).join(', ')
+                              : '';
+                            return (
+                              <div
+                                key={it.id ?? i}
+                                style={{
+                                  background: 'rgba(255,255,255,0.45)',
+                                  border: '1.5px solid #e0d0b0',
+                                  borderRadius: 14,
+                                  padding: '10px 12px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                }}
+                              >
+                                <span style={{ fontSize: 22 }}>{it.item_emoji || '☕'}</span>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p
+                                    style={{
+                                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      color: '#1a2e1a',
+                                      margin: 0,
+                                    }}
+                                  >
+                                    {it.quantity > 1 ? `${it.quantity}× ` : ''}
+                                    {it.item_name}
+                                  </p>
+                                  {modStr ? (
+                                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)', margin: '2px 0 0' }}>
+                                      {modStr}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 600, color: '#1a2e1a' }}>
+                                  £{((Number(it.unit_price) * Number(it.quantity)) / 100).toFixed(2)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {!isUpdateEditMode && addingToOrderId != null ? <p style={{ ...sectionLabelStyle, marginTop: 0 }}>Adding</p> : null}
+
+                  {!isUpdateEditMode && items.length === 0 && addingToOrderId == null ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '64px 0', textAlign: 'center' }}>
                       <span style={{ fontSize: 48, marginBottom: 12 }}>🛒</span>
                       <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 700, color: 'rgba(26,46,26,0.4)' }}>Your cart is empty</p>
                     </div>
-                  ) : (
+                  ) : !isUpdateEditMode && items.length === 0 && addingToOrderId != null ? (
+                    <div style={{ textAlign: 'center', padding: '28px 12px 48px' }}>
+                      <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 700, color: 'rgba(26,46,26,0.55)', margin: 0 }}>
+                        Choose items from the menu to add to this order.
+                      </p>
+                    </div>
+                  ) : !isUpdateEditMode && items.length > 0 ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {items.map((item) => (
                         <motion.div
@@ -322,12 +697,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                               color: 'rgba(26,46,26,0.45)',
                               margin: '4px 0 0',
                             }}>
-                              {[
-                                item.size !== 'Regular' && item.size,
-                                !['Full Fat', 'Regular'].includes(item.milk) && item.milk,
-                                item.syrup && `${item.syrup} syrup`,
-                                ...(item.alterations ?? []),
-                              ].filter(Boolean).join(', ') || (item.category === 'coffee' ? 'Regular' : null)}
+                              {lineMetaCaption(item)}
                             </p>
                             {item.customerNote ? (
                               <p style={{
@@ -370,7 +740,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                         </motion.div>
                       ))}
                     </div>
-                  )}
+                  ) : null}
                 </div>
 
                 {items.length > 0 && (
@@ -444,6 +814,57 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                       </p>
                     )}
 
+                    {isUpdateEditMode ? (
+                      <>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                          <span style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: 'rgba(26,46,26,0.5)',
+                          }}>
+                            Already on order
+                          </span>
+                          <span style={{
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 18,
+                            fontWeight: 800,
+                            color: 'rgba(26,46,26,0.65)',
+                          }}>
+                            £{(existingSubtotal / 100).toFixed(2)}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                          <span style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 12,
+                            fontWeight: 600,
+                            color: 'rgba(26,46,26,0.5)',
+                          }}>
+                            New items
+                          </span>
+                          <span style={{
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 18,
+                            fontWeight: 800,
+                            color: '#1a2e1a',
+                          }}>
+                            £{(newSubtotal / 100).toFixed(2)}
+                          </span>
+                        </div>
+                        <p style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 11,
+                          color: 'rgba(26,46,26,0.45)',
+                          margin: '0 0 4px',
+                          lineHeight: 1.4,
+                        }}
+                        >
+                          Save changes updates pickup, allergies, and your full cart together (not a separate payment).
+                        </p>
+                      </>
+                    ) : null}
+
                     <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                       <span style={{
                         fontFamily: 'Plus Jakarta Sans, sans-serif',
@@ -453,7 +874,7 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                         textTransform: 'uppercase',
                         color: 'rgba(26,46,26,0.45)',
                       }}>
-                        Total
+                        {addingToOrderId != null ? 'Add-ons total' : isUpdateEditMode ? 'Order total' : 'Total'}
                       </span>
                       <span style={{
                         fontFamily: 'Fraunces, Georgia, serif',
@@ -466,113 +887,117 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                       </span>
                     </div>
 
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      background: 'rgba(255,255,255,0.5)',
-                      border: '1.5px solid #e0d0b0',
-                      borderRadius: 16,
-                      padding: '12px 16px',
-                    }}>
-                      <div>
-                        <p style={{
-                          fontFamily: 'Fraunces, Georgia, serif',
-                          fontSize: 15,
-                          fontWeight: 700,
-                          color: '#1a2e1a',
-                          margin: 0,
+                    {addingToOrderId == null ? (
+                      <>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: 'rgba(255,255,255,0.5)',
+                          border: '1.5px solid #e0d0b0',
+                          borderRadius: 16,
+                          padding: '12px 16px',
                         }}>
-                          Pickup time
-                        </p>
-                        <p style={{
-                          fontFamily: 'Plus Jakarta Sans, sans-serif',
-                          fontSize: 12,
-                          color: 'rgba(26,46,26,0.45)',
-                          margin: '2px 0 0',
-                        }}>
-                          {formatPickupTimeWithAtPrefix(pickupMinutes)}
-                        </p>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <button
-                          type="button"
-                          onClick={() => adjustPickup(-PICKUP_STEP)}
-                          disabled={pickupMinutes === PICKUP_MIN_PICKUP}
-                          style={{ ...stepperBtn, opacity: pickupMinutes === PICKUP_MIN_PICKUP ? 0.3 : 1 }}
-                        >
-                          −
-                        </button>
-                        <span style={{
-                          fontFamily: 'Fraunces, Georgia, serif',
-                          fontWeight: 700,
-                          color: '#1a2e1a',
-                          fontSize: 14,
-                          width: 40,
-                          textAlign: 'center',
-                        }}>
-                          {pickupMinutes === PICKUP_MIN_PICKUP ? 'ASAP' : `${pickupMinutes}m`}
-                        </span>
-                        <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>+</button>
-                      </div>
-                    </div>
+                          <div>
+                            <p style={{
+                              fontFamily: 'Fraunces, Georgia, serif',
+                              fontSize: 15,
+                              fontWeight: 700,
+                              color: '#1a2e1a',
+                              margin: 0,
+                            }}>
+                              Pickup time
+                            </p>
+                            <p style={{
+                              fontFamily: 'Plus Jakarta Sans, sans-serif',
+                              fontSize: 12,
+                              color: 'rgba(26,46,26,0.45)',
+                              margin: '2px 0 0',
+                            }}>
+                              {formatPickupTimeWithAtPrefix(pickupMinutes)}
+                            </p>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            <button
+                              type="button"
+                              onClick={() => adjustPickup(-PICKUP_STEP)}
+                              disabled={pickupMinutes === PICKUP_MIN_PICKUP}
+                              style={{ ...stepperBtn, opacity: pickupMinutes === PICKUP_MIN_PICKUP ? 0.3 : 1 }}
+                            >
+                              −
+                            </button>
+                            <span style={{
+                              fontFamily: 'Fraunces, Georgia, serif',
+                              fontWeight: 700,
+                              color: '#1a2e1a',
+                              fontSize: 14,
+                              width: 40,
+                              textAlign: 'center',
+                            }}>
+                              {pickupMinutes === PICKUP_MIN_PICKUP ? 'ASAP' : `${pickupMinutes}m`}
+                            </span>
+                            <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>+</button>
+                          </div>
+                        </div>
 
-                    <div
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        background: 'rgba(255,255,255,0.35)',
-                        border: '1.5px solid #e0d0b0',
-                        borderRadius: 16,
-                        padding: '12px 16px',
-                      }}
-                    >
-                      <span style={{
-                        fontFamily: 'Plus Jakarta Sans, sans-serif',
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: '#1a2e1a',
-                      }}>
-                        Do you have any allergies?
-                      </span>
-                      <button
-                        type="button"
-                        role="switch"
-                        aria-checked={allergyToggle}
-                        onClick={() => {
-                          setAllergyToggle((v) => !v);
-                          if (allergyToggle) setOrderAllergens([]);
-                        }}
-                        style={{
-                          width: 48,
-                          height: 28,
-                          borderRadius: 999,
-                          border: 'none',
-                          cursor: 'pointer',
-                          background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
-                          position: 'relative',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <span
+                        <div
                           style={{
-                            position: 'absolute',
-                            top: 3,
-                            left: allergyToggle ? 24 : 3,
-                            width: 22,
-                            height: 22,
-                            borderRadius: '50%',
-                            background: '#f0e6d0',
-                            transition: 'left 0.15s ease',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            background: 'rgba(255,255,255,0.35)',
+                            border: '1.5px solid #e0d0b0',
+                            borderRadius: 16,
+                            padding: '12px 16px',
                           }}
-                        />
-                      </button>
-                    </div>
+                        >
+                          <span style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: '#1a2e1a',
+                          }}>
+                            Do you have any allergies?
+                          </span>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={allergyToggle}
+                            onClick={() => {
+                              setAllergyToggle((v) => !v);
+                              if (allergyToggle) setOrderAllergens([]);
+                            }}
+                            style={{
+                              width: 48,
+                              height: 28,
+                              borderRadius: 999,
+                              border: 'none',
+                              cursor: 'pointer',
+                              background: allergyToggle ? '#1a2e1a' : 'rgba(26,46,26,0.15)',
+                              position: 'relative',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span
+                              style={{
+                                position: 'absolute',
+                                top: 3,
+                                left: allergyToggle ? 24 : 3,
+                                width: 22,
+                                height: 22,
+                                borderRadius: '50%',
+                                background: '#f0e6d0',
+                                transition: 'left 0.15s ease',
+                              }}
+                            />
+                          </button>
+                        </div>
 
-                    {allergyToggle && (
-                      <AllergyChipsInput value={orderAllergens} onChange={setOrderAllergens} />
-                    )}
+                        {allergyToggle && (
+                          <AllergyChipsInput value={orderAllergens} onChange={setOrderAllergens} />
+                        )}
+                      </>
+                    ) : null}
 
                     <motion.button
                       whileTap={{ scale: 0.97 }}
@@ -602,12 +1027,12 @@ export default function CartDrawer({ open, onClose, onEditLine }) {
                             <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                           </svg>
                           <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                            Placing order…
+                            {addingToOrderId != null ? 'Opening checkout…' : 'Placing order…'}
                           </span>
                         </>
                       ) : (
                         <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
-                          {editOrderId != null ? 'Save changes' : 'Place order'}
+                          {addingToOrderId != null ? 'Pay for add-ons' : editOrderId != null ? 'Save changes' : 'Place order'}
                         </span>
                       )}
                     </motion.button>
