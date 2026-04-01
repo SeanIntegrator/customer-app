@@ -1,6 +1,9 @@
-import { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { createContext, useContext, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEnrichedCatalog } from '../lib/catalogEnrich';
+import { useCartLinesDomain } from './cart/useCartLinesDomain';
+import { useOrderLifecycleDomain } from './cart/useOrderLifecycleDomain';
+import { usePostCheckoutFeedbackDomain } from './cart/usePostCheckoutFeedbackDomain';
 
 const CartContext = createContext(null);
 
@@ -16,157 +19,56 @@ function normalizeAllergensFromApi(raw) {
 
 export function CartProvider({ children }) {
   const navigate = useNavigate();
-  const [items, setItems] = useState([]);
-  const [orderAllergens, setOrderAllergens] = useState([]);
-  const [activeOrder, setActiveOrder] = useState(null);
-  const [editOrderId, setEditOrderId] = useState(null);
-  /** Pay for add-ons: target DB order id; cart holds only new lines. */
-  const [addingToOrderId, setAddingToOrderId] = useState(null);
-  /** Home sets when gold card shows a Stripe-paid order without add-to-order flow (hides nav badge for empty/stale cart). */
-  const [suppressNavBasketForPaidGoldCard, setSuppressNavBasketForPaidGoldCard] = useState(false);
-  /** Opens the feedback sheet (after KDS marks the matching order complete). */
-  const [postCheckoutFeedbackOrderId, setPostCheckoutFeedbackOrderId] = useState(null);
-  /** @type {React.MutableRefObject<{ dbOrderId: number, squareOrderId: string }[]>} */
-  const pendingKdsFeedbackRef = useRef([]);
-  const [applyReward, setApplyReward] = useState(false);
-  const clearActiveOrder = useCallback(() => setActiveOrder(null), []);
-  const beginPostCheckoutFeedback = useCallback((orderId) => {
-    if (orderId == null || orderId === '') return;
-    setPostCheckoutFeedbackOrderId(orderId);
-  }, []);
-  const clearPostCheckoutFeedback = useCallback(() => setPostCheckoutFeedbackOrderId(null), []);
-
-  const registerPendingKdsFeedback = useCallback(({ dbOrderId, squareOrderId }) => {
-    if (dbOrderId == null || squareOrderId == null || squareOrderId === '') return;
-    pendingKdsFeedbackRef.current.push({
-      dbOrderId: Number(dbOrderId),
-      squareOrderId: String(squareOrderId),
-    });
-  }, []);
-
-  const editOrderIdRef = useRef(null);
-  const addingToOrderIdRef = useRef(null);
-  editOrderIdRef.current = editOrderId;
-  addingToOrderIdRef.current = addingToOrderId;
-
-  const applyKdsOrderCompleted = useCallback(
-    (payload) => {
-      const incomingDb = payload?.dbOrderId;
-      const sq = payload?.squareOrderId != null ? String(payload.squareOrderId) : '';
-
-      setActiveOrder((prev) => {
-        if (!prev) return prev;
-        const prevDb = prev.dbOrderId ?? prev.orderId;
-        const matchDb = incomingDb != null && prevDb != null && Number(prevDb) === Number(incomingDb);
-        const matchSq =
-          sq !== '' &&
-          prev.squareOrderId != null &&
-          String(prev.squareOrderId) === sq;
-        if (matchDb || matchSq) return null;
-        return prev;
-      });
-
-      const list = pendingKdsFeedbackRef.current;
-      const idx = list.findIndex(
-        (o) =>
-          (incomingDb != null && Number(o.dbOrderId) === Number(incomingDb)) ||
-          (sq !== '' && o.squareOrderId === sq)
-      );
-
-      let feedbackOrderId = null;
-      if (idx !== -1) {
-        const [hit] = list.splice(idx, 1);
-        feedbackOrderId = hit.dbOrderId;
-      }
-
-      if (incomingDb != null) {
-        const dbN = Number(incomingDb);
-        const ed = editOrderIdRef.current;
-        const ad = addingToOrderIdRef.current;
-        if (ed != null && Number(ed) === dbN) {
-          setEditOrderId(null);
-          setItems([]);
-          setOrderAllergens([]);
-          if (feedbackOrderId == null) feedbackOrderId = dbN;
-        }
-        if (ad != null && Number(ad) === dbN) {
-          setAddingToOrderId(null);
-          setItems([]);
-          setOrderAllergens([]);
-          if (feedbackOrderId == null) feedbackOrderId = dbN;
-        }
-      }
-
-      if (feedbackOrderId != null) {
-        beginPostCheckoutFeedback(feedbackOrderId);
-      }
-    },
-    [beginPostCheckoutFeedback]
-  );
-
-  const lineDedupeKey = useCallback((i) => {
-    const altKey = (x) => (x.alterations ?? []).slice().sort().join(',');
-    const note = (i.customerNote ?? '').trim();
-    return `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}|${note}`;
-  }, []);
-
-  const addItem = useCallback(
-    (item) => {
-      setItems((prev) => {
-        const key = lineDedupeKey(item);
-        const existing = prev.find((i) => lineDedupeKey(i) === key);
-        if (existing) {
-          return prev.map((i) =>
-            lineDedupeKey(i) === key
-              ? {
-                  ...i,
-                  quantity: i.quantity + (item.quantity ?? 1),
-                  fromExistingOrder: Boolean(i.fromExistingOrder || item.fromExistingOrder),
-                }
-              : i
-          );
-        }
-        return [...prev, { ...item, quantity: item.quantity ?? 1, fromExistingOrder: item.fromExistingOrder ?? false }];
-      });
-    },
-    [lineDedupeKey]
-  );
-
-  const removeItem = useCallback((cartId) => {
-    setItems((prev) => prev.filter((i) => i.cartId !== cartId || i.fromExistingOrder));
-  }, []);
-
-  const updateQuantity = useCallback((cartId, delta) => {
-    setItems((prev) =>
-      prev
-        .map((i) => {
-          if (i.cartId !== cartId) return i;
-          if (i.fromExistingOrder) return i;
-          return { ...i, quantity: i.quantity + delta };
-        })
-        .filter((i) => i.quantity > 0)
-    );
-  }, []);
-
-  const updateCartLine = useCallback((cartId, updates) => {
-    setItems((prev) =>
-      prev.map((i) => (i.cartId === cartId && !i.fromExistingOrder ? { ...i, ...updates } : i))
-    );
-  }, []);
-
-  const clearCart = useCallback(() => {
-    setItems([]);
-    setOrderAllergens([]);
-    setApplyReward(false);
-  }, []);
+  const cartLines = useCartLinesDomain();
+  const orderLifecycle = useOrderLifecycleDomain();
+  const feedback = usePostCheckoutFeedbackDomain({
+    editOrderId: orderLifecycle.editOrderId,
+    addingToOrderId: orderLifecycle.addingToOrderId,
+    setEditOrderId: orderLifecycle.setEditOrderId,
+    setAddingToOrderId: orderLifecycle.setAddingToOrderId,
+    setActiveOrder: orderLifecycle.setActiveOrder,
+    setItems: cartLines.setItems,
+    setOrderAllergens: cartLines.setOrderAllergens,
+  });
+  const {
+    items,
+    addItem,
+    removeItem,
+    updateQuantity,
+    updateCartLine,
+    clearCart,
+    totalItems,
+    subtotal,
+    orderAllergens,
+    setOrderAllergens,
+    applyReward,
+    setApplyReward,
+  } = cartLines;
+  const {
+    activeOrder,
+    setActiveOrder,
+    clearActiveOrder,
+    editOrderId,
+    setEditOrderId,
+    addingToOrderId,
+    suppressNavBasketForPaidGoldCard,
+    setSuppressNavBasketForPaidGoldCard,
+  } = orderLifecycle;
+  const {
+    postCheckoutFeedbackOrderId,
+    beginPostCheckoutFeedback,
+    clearPostCheckoutFeedback,
+    registerPendingKdsFeedback,
+    applyKdsOrderCompleted,
+  } = feedback;
 
   /** Pre-fill cart from API order shape; opening menu to add more items before PATCH checkout. */
   const loadCartFromOrderEdit = useCallback(async (apiOrder) => {
     if (!apiOrder?.id) return;
-    setAddingToOrderId(null);
-    setApplyReward(false);
-    setEditOrderId(apiOrder.id);
-    setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
+    orderLifecycle.setAddingToOrderId(null);
+    cartLines.setApplyReward(false);
+    orderLifecycle.setEditOrderId(apiOrder.id);
+    cartLines.setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
 
     let variationById = {};
     try {
@@ -176,7 +78,7 @@ export function CartProvider({ children }) {
       /* menu lookup optional */
     }
 
-    setItems(
+    cartLines.setItems(
       (apiOrder.items || []).map((it, idx) => {
         const vid = it.square_variation_id;
         const meta = vid && variationById[vid] ? variationById[vid] : null;
@@ -200,41 +102,34 @@ export function CartProvider({ children }) {
         };
       })
     );
-  }, []);
+  }, [cartLines, orderLifecycle]);
 
   const clearEditMode = useCallback(() => {
-    setEditOrderId(null);
-    setOrderAllergens([]);
-  }, []);
+    orderLifecycle.setEditOrderId(null);
+    cartLines.setOrderAllergens([]);
+  }, [cartLines, orderLifecycle]);
 
   const startAddingToOrder = useCallback(
     (orderId) => {
       if (orderId == null) return;
-      setEditOrderId(null);
-      setApplyReward(false);
-      setAddingToOrderId(Number(orderId));
-      setItems([]);
-      setOrderAllergens([]);
+      orderLifecycle.setEditOrderId(null);
+      cartLines.setApplyReward(false);
+      orderLifecycle.setAddingToOrderId(Number(orderId));
+      cartLines.setItems([]);
+      cartLines.setOrderAllergens([]);
       navigate('/order');
     },
-    [navigate]
+    [cartLines, navigate, orderLifecycle]
   );
-
-  const clearAddingToOrder = useCallback(() => {
-    setAddingToOrderId(null);
-  }, []);
 
   /** Replace cart with lines (e.g. usual order); clears edit mode. */
   const replaceCartLines = useCallback((lines, opts = {}) => {
-    setEditOrderId(null);
-    setAddingToOrderId(null);
-    setApplyReward(false);
-    setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
-    setItems(Array.isArray(lines) ? lines : []);
-  }, []);
-
-  const totalItems = items.reduce((s, i) => s + i.quantity, 0);
-  const subtotal = items.reduce((s, i) => s + i.totalPrice * i.quantity, 0);
+    orderLifecycle.setEditOrderId(null);
+    orderLifecycle.setAddingToOrderId(null);
+    cartLines.setApplyReward(false);
+    cartLines.setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
+    cartLines.setItems(Array.isArray(lines) ? lines : []);
+  }, [cartLines, orderLifecycle]);
 
   return (
     <CartContext.Provider
@@ -258,7 +153,7 @@ export function CartProvider({ children }) {
         clearEditMode,
         addingToOrderId,
         startAddingToOrder,
-        clearAddingToOrder,
+        clearAddingToOrder: orderLifecycle.clearAddingToOrder,
         replaceCartLines,
         postCheckoutFeedbackOrderId,
         beginPostCheckoutFeedback,

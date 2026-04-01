@@ -1,12 +1,3 @@
-/** Mock loyalty stats until backend loyalty APIs exist. */
-export const DEMO_LOYALTY = {
-  memberSince: 'January 2024',
-  stamps: 6,
-  stampsGoal: 9,
-  totalOrders: 23,
-  favoriteItems: ['Flat White (Oat)', 'Almond Croissant'],
-};
-
 export const EVENTS = [
   {
     id: 1,
@@ -83,37 +74,6 @@ export const PROMOTIONS = [
   },
 ];
 
-export const ORDER_HISTORY = [
-  {
-    id: 'ORD-023',
-    date: 'Today, 8:42am',
-    items: ['Flat White (Oat)', 'Almond Croissant'],
-    total: 8.50,
-    status: 'completed',
-  },
-  {
-    id: 'ORD-022',
-    date: 'Mon 4 Mar, 9:15am',
-    items: ['Latte (Oat, Large)', 'Pain au Chocolat'],
-    total: 9.20,
-    status: 'completed',
-  },
-  {
-    id: 'ORD-021',
-    date: 'Fri 28 Feb, 8:30am',
-    items: ['Flat White', 'Plain Croissant', 'Espresso'],
-    total: 10.30,
-    status: 'completed',
-  },
-  {
-    id: 'ORD-020',
-    date: 'Wed 26 Feb, 2:10pm',
-    items: ['Iced Matcha Latte (Oat)', 'Pistachio swirl'],
-    total: 9.80,
-    status: 'completed',
-  },
-];
-
 // Fallback prices by keyword (pence) — used when Square catalog has no price
 export const PRICE_MAP = {
   espresso: 260,
@@ -178,26 +138,6 @@ export const MILK_OPTIONS = [
   { name: 'Soy', delta: 50 },
   { name: 'Coconut', delta: 50 },
   { name: 'Skinny', delta: 0 },
-];
-
-// Usual order — hardcoded, used by the Reorder shortcut on the home screen
-export const USUAL_ORDER = [
-  {
-    catalogObjectId: 'USUAL_FLAT_WHITE',
-    name: 'Flat White',
-    emoji: '☕',
-    size: 'Regular',
-    milk: 'Oat',
-    totalPrice: 400,
-  },
-  {
-    catalogObjectId: 'USUAL_ALMOND_CROISSANT',
-    name: 'Almond Croissant',
-    emoji: '🥐',
-    size: 'Regular',
-    milk: 'Full Fat',
-    totalPrice: 400,
-  },
 ];
 
 // Syrup chip colour palette — keyword-matched by modifier name from Square

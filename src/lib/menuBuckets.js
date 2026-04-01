@@ -11,6 +11,7 @@ export const MENU_BUCKETS = [
 ];
 
 const OTHER_SLUG = 'other';
+export const DEFAULT_REWARD_DRINK_CATEGORY_SLUGS = ['matcha', 'hot-drinks', 'iced-drinks'];
 
 /**
  * Map a Square category display name to a stable menu bucket slug.
@@ -39,6 +40,6 @@ export function menuBucketSlugForSquareCategory(squareCategoryName) {
 }
 
 /** Drink menu buckets eligible for free-drink loyalty reward (matches cafe-orders lib/menu-bucket). */
-export function isDrinkLoyaltyCategory(slug) {
-  return slug === 'matcha' || slug === 'hot-drinks' || slug === 'iced-drinks';
+export function isDrinkLoyaltyCategory(slug, drinkCategorySlugs = DEFAULT_REWARD_DRINK_CATEGORY_SLUGS) {
+  return Array.isArray(drinkCategorySlugs) && drinkCategorySlugs.includes(slug);
 }

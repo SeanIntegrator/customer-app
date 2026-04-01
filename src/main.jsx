@@ -3,8 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './context/AuthContext';
+import { AppConfigProvider } from './context/AppConfigContext';
 import { LoyaltyProvider } from './context/LoyaltyContext';
 import { CartProvider } from './context/CartContext';
+import { OrderEventsProvider } from './context/OrderEventsContext';
 import App from './App';
 import Home from './pages/Home';
 import OrderShell from './pages/OrderShell';
@@ -23,11 +25,15 @@ const router = createBrowserRouter([
     path: '/',
     element: (
       <AuthProvider>
-        <LoyaltyProvider>
-          <CartProvider>
-            <App />
-          </CartProvider>
-        </LoyaltyProvider>
+        <AppConfigProvider>
+          <LoyaltyProvider>
+            <CartProvider>
+              <OrderEventsProvider>
+                <App />
+              </OrderEventsProvider>
+            </CartProvider>
+          </LoyaltyProvider>
+        </AppConfigProvider>
       </AuthProvider>
     ),
     children: [

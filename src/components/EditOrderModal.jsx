@@ -18,6 +18,10 @@ import {
   CHECKOUT_PRIMARY_SHADOW,
   CHECKOUT_PRIMARY_TEXT,
 } from '../lib/checkoutTheme';
+import {
+  mapApiOrderToEditableLines,
+  mapEditableLinesToUpdatePayload,
+} from './edit-order/mappers';
 
 const stepperBtn = checkoutStepperButtonStyle;
 
@@ -81,18 +85,7 @@ export default function EditOrderModal({
         setAllergyToggle(ag.length > 0);
         setPickupMinutes(pickupIsoToStepperMinutes(o.pickup_time));
         setStatus(o.status || '');
-        setLines(
-          (o.items || []).map((it, idx) => ({
-            key: `${it.id}-${idx}`,
-            square_variation_id: it.square_variation_id,
-            item_name: it.item_name,
-            item_emoji: it.item_emoji || '☕',
-            quantity: it.quantity,
-            unit_price: it.unit_price,
-            modifiers: it.modifiers || [],
-            customer_note: it.customer_note != null ? String(it.customer_note) : '',
-          }))
-        );
+        setLines(mapApiOrderToEditableLines(o));
       } catch (e) {
         if (!cancelled) setError(e.message || 'Could not load order');
       } finally {
@@ -142,18 +135,7 @@ export default function EditOrderModal({
         note: null,
         allergens: allergenPayload,
         pickup_minutes: pickupMinutes,
-        line_items: lines.map((l) => {
-          const cn = (l.customer_note || '').trim();
-          return {
-            catalog_object_id: l.square_variation_id,
-            quantity: l.quantity,
-            item_name: l.item_name,
-            unit_price: l.unit_price,
-            emoji: l.item_emoji,
-            modifiers: l.modifiers,
-            ...(cn ? { customer_note: cn } : {}),
-          };
-        }),
+        line_items: mapEditableLinesToUpdatePayload(lines),
       });
       onSaved?.();
       setUpdateSuccess(true);

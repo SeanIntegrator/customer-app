@@ -115,6 +115,7 @@ export function AuthProvider({ children }) {
       credentials: 'include',
     });
   }, []);
+  const hasStoredToken = useCallback(() => Boolean(readStoredToken()), []);
 
   const value = {
     user,
@@ -123,6 +124,7 @@ export function AuthProvider({ children }) {
     handleGoogleCredential,
     logout,
     authFetch,
+    hasStoredToken,
     refreshSession: checkSession,
   };
 

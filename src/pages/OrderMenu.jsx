@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOutletContext, useParams, useNavigate } from 'react-router-dom';
 import MenuItem from '../components/MenuItem';
+import { MenuLoadingPanel, MenuErrorPanel, MenuEmptyPanel } from '../components/MenuStatePanels';
 
 export default function OrderMenu() {
   const { categorySlug: rawSlug } = useParams();
@@ -58,26 +59,10 @@ export default function OrderMenu() {
             key={cat.slug}
             type="button"
             onClick={() => navigate(`/order/menu/${encodeURIComponent(cat.slug)}`)}
+            className={`menu-chip ${categorySlug === cat.slug ? 'menu-chip--active' : 'menu-chip--idle'}`}
             style={{
-              flexShrink: 0,
-              padding: '7px 16px',
-              borderRadius: 100,
-              fontSize: 12,
-              fontFamily: 'Plus Jakarta Sans, sans-serif',
-              fontWeight: 600,
               cursor: 'pointer',
-              transition: 'all 0.18s ease',
               border: 'none',
-              ...(categorySlug === cat.slug
-                ? {
-                    background: '#1a2e1a',
-                    color: '#f0e6d0',
-                  }
-                : {
-                    background: 'rgba(240,230,208,0.6)',
-                    border: '1.5px solid #d4c0a0',
-                    color: '#6a5a48',
-                  }),
             }}
           >
             {cat.label}
@@ -90,29 +75,12 @@ export default function OrderMenu() {
 
       <div className="scrollbar-hide" style={{ padding: '0 16px 96px' }}>
         {loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', gap: 12 }}>
-            <svg className="w-8 h-8 animate-spin" viewBox="0 0 24 24" fill="none" style={{ color: '#6a5a48', width: 32, height: 32 }}>
-              <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#6a5a48' }}>Loading menu…</p>
-          </div>
+          <MenuLoadingPanel />
         )}
 
-        {error && !loading && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}>
-            <span style={{ fontSize: 48, marginBottom: 12 }}>😔</span>
-            <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 700, color: '#1a2e1a', marginBottom: 4 }}>Couldn&apos;t load the menu</p>
-            <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#6a5a48' }}>Make sure the server is running</p>
-          </div>
-        )}
+        {error && !loading && <MenuErrorPanel />}
 
-        {!loading && !error && slugSet.has(categorySlug) && filtered.length === 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '80px 0', textAlign: 'center' }}>
-            <span style={{ fontSize: 48, marginBottom: 12 }}>🫙</span>
-            <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 700, color: '#1a2e1a' }}>Nothing here yet</p>
-          </div>
-        )}
+        {!loading && !error && slugSet.has(categorySlug) && filtered.length === 0 && <MenuEmptyPanel />}
 
         {!loading && !error && filtered.length > 0 && (
           <motion.div layout style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 4 }}>

@@ -6,7 +6,7 @@ import FeedbackModal from './FeedbackModal';
 import GoogleReviewPrompt from './GoogleReviewPrompt';
 import Toast from './Toast';
 import { GOOGLE_REVIEW_PLACE_URL } from '../lib/api';
-import { getCafeSocket } from '../lib/cafeSocket';
+import { useOrderEvents } from '../context/OrderEventsContext';
 
 export default function PostOrderFeedbackLayer() {
   const navigate = useNavigate();
@@ -16,6 +16,7 @@ export default function PostOrderFeedbackLayer() {
     applyKdsOrderCompleted,
   } = useCart();
   const { authFetch } = useAuth();
+  const { subscribe } = useOrderEvents();
 
   const [googleOpen, setGoogleOpen] = useState(false);
   const [googleUrl, setGoogleUrl] = useState(GOOGLE_REVIEW_PLACE_URL);
@@ -70,18 +71,12 @@ export default function PostOrderFeedbackLayer() {
   }, [postCheckoutFeedbackOrderId]);
 
   useEffect(() => {
-    const socket = getCafeSocket();
-    if (!socket) return undefined;
-
     const onCompleted = (payload) => {
       applyKdsRef.current?.(payload);
     };
 
-    socket.on('customerOrderCompleted', onCompleted);
-    return () => {
-      socket.off('customerOrderCompleted', onCompleted);
-    };
-  }, []);
+    return subscribe('customerOrderCompleted', onCompleted);
+  }, [subscribe]);
 
   const feedbackOpen = postCheckoutFeedbackOrderId != null;
 

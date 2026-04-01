@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Outlet, useLocation, useNavigate, useBlocker } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import useCatalog from '../hooks/useCatalog';
+import { useOrderFlowGuard } from '../hooks/useOrderFlowGuard';
 import { fetchCustomerOrders, fetchCustomerOrder } from '../lib/api';
 import { PAPER_GRAIN_BACKGROUND, orderReadyInOneLine, isPickupTooCloseForOrderModify } from '../lib/pickup';
 import {
@@ -15,14 +16,10 @@ import ItemDetailSheet from '../components/ItemDetailSheet';
 import CartDrawer from '../components/CartDrawer';
 import Toast from '../components/Toast';
 
-function orderFlowPath(p) {
-  return p === '/order' || p.startsWith('/order/menu/');
-}
-
 export default function OrderShell() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, loading: authLoading, authFetch } = useAuth();
+  const { user, loading: authLoading, authFetch, hasStoredToken } = useAuth();
   const {
     items: catalogItems,
     menuCategories,
@@ -55,38 +52,12 @@ export default function OrderShell() {
   const [basketToast, setBasketToast] = useState({ message: '', visible: false });
   const basketToastTimerRef = useRef(null);
 
-  const basketDirty = useMemo(
-    () =>
-      (addingToOrderId != null && cartItems.length > 0) ||
-      (editOrderId != null && cartItems.some((i) => !i.fromExistingOrder)),
-    [addingToOrderId, editOrderId, cartItems]
-  );
-
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
-    if (!basketDirty) return false;
-    const cur = currentLocation.pathname;
-    const next = nextLocation.pathname;
-    return orderFlowPath(cur) && !orderFlowPath(next);
+  const { blocker, qtyByCatalogId } = useOrderFlowGuard({
+    addingToOrderId,
+    editOrderId,
+    cartItems,
   });
-
-  const hasAuthToken =
-    typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('auth_token');
-
-  const qtyByCatalogId = useMemo(() => {
-    const m = new Map();
-    for (const line of cartItems) {
-      const cid = line.catalogObjectId;
-      if (!cid) continue;
-      const fromOrder =
-        editOrderId != null &&
-        (line.fromExistingOrder === true || String(line.cartId || '').startsWith('edit-'));
-      const cur = m.get(cid) || { basket: 0, ordered: 0 };
-      if (fromOrder) cur.ordered += line.quantity;
-      else cur.basket += line.quantity;
-      m.set(cid, cur);
-    }
-    return m;
-  }, [cartItems, editOrderId]);
+  const hasAuthToken = hasStoredToken();
 
   useEffect(() => {
     if (authLoading) return;

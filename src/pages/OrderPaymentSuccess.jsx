@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useLoyalty } from '../context/LoyaltyContext';
-import { fetchOrderByCheckoutSession } from '../lib/api';
+import { fetchOrderByCheckoutSession, finalizeCheckoutSession } from '../lib/api';
 import OrderSuccess from '../components/OrderSuccess';
 import SignInButton from '../components/SignInButton';
 import {
@@ -69,6 +69,7 @@ export default function OrderPaymentSuccess() {
 
     let cancelled = false;
     let attempts = 0;
+    let finalizeAttempts = 0;
 
     const tick = async () => {
       if (cancelled) return;
@@ -89,6 +90,15 @@ export default function OrderPaymentSuccess() {
         if (cancelled) return;
         if (e.code === 'NOT_READY') {
           attempts += 1;
+          // Fallback fulfillment trigger for delayed/missed webhook processing.
+          if (attempts >= 3 && (attempts === 3 || attempts % 5 === 0) && finalizeAttempts < 8) {
+            finalizeAttempts += 1;
+            try {
+              await finalizeCheckoutSession(authFetch, sessionId);
+            } catch (_) {
+              /* keep polling; webhook/finalizer may still complete shortly */
+            }
+          }
           if (attempts >= 90) {
             setPhase('error');
             return;

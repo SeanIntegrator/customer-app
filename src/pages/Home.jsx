@@ -15,10 +15,10 @@ import HomeHero from '../components/home/HomeHero';
 import HomeBridgingCta from '../components/home/HomeBridgingCta';
 import HomeWhatsOnSection from '../components/home/HomeWhatsOnSection';
 import QRModal from '../components/home/QRModal';
-import { getCafeSocket } from '../lib/cafeSocket';
 import { unpaidBasketQuantity } from '../lib/basketUnpaidQty';
 import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
+import { useOrderEvents } from '../context/OrderEventsContext';
 
 export default function Home() {
   const navigate = useNavigate();
@@ -34,7 +34,8 @@ export default function Home() {
   } = useCart();
   const activeOrderRef = useRef(activeOrder);
   activeOrderRef.current = activeOrder;
-  const { user, loading: authLoading, isAuthenticated, authFetch } = useAuth();
+  const { user, loading: authLoading, isAuthenticated, authFetch, hasStoredToken } = useAuth();
+  const { subscribe } = useOrderEvents();
   const loyalty = useLoyalty();
   const [showQR, setShowQR] = useState(false);
   const [serverLiveOrder, setServerLiveOrder] = useState(null);
@@ -44,8 +45,7 @@ export default function Home() {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [cancelSuccess, setCancelSuccess] = useState({ open: false, refundedPence: 0 });
 
-  const hasAuthToken =
-    typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('auth_token');
+  const hasAuthToken = hasStoredToken();
 
   const refreshLiveOrder = useCallback(async () => {
     if (!isAuthenticated) {
@@ -78,9 +78,6 @@ export default function Home() {
   refreshLoyaltyRef.current = loyalty.refreshAfterOrder;
 
   useEffect(() => {
-    const socket = getCafeSocket();
-    if (!socket) return undefined;
-
     const onOrderCancelled = (payload) => {
       const dbId = payload?.dbOrderId;
       if (dbId == null) return;
@@ -117,13 +114,13 @@ export default function Home() {
       refreshLoyaltyRef.current();
     };
 
-    socket.on('customerOrderCompleted', onKdsCompleted);
-    socket.on('orderCancelled', onOrderCancelled);
+    const offCompleted = subscribe('customerOrderCompleted', onKdsCompleted);
+    const offCancelled = subscribe('orderCancelled', onOrderCancelled);
     return () => {
-      socket.off('customerOrderCompleted', onKdsCompleted);
-      socket.off('orderCancelled', onOrderCancelled);
+      offCompleted();
+      offCancelled();
     };
-  }, []);
+  }, [subscribe]);
 
   const goldCardModel = (() => {
     if (serverLiveOrder) {

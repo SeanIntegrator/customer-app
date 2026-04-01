@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
+import { useAppConfig } from './AppConfigContext';
 import { fetchCustomerLoyalty } from '../lib/api';
 import { STAMPS_PER_REWARD } from '../lib/loyaltyDiscount';
 
@@ -7,9 +8,11 @@ const LoyaltyContext = createContext(null);
 
 export function LoyaltyProvider({ children }) {
   const { isAuthenticated, authFetch } = useAuth();
+  const { loyalty } = useAppConfig();
+  const stampsGoal = loyalty?.stampsPerReward ?? STAMPS_PER_REWARD;
   const [stampsCount, setStampsCount] = useState(0);
   const [rewardsAvailable, setRewardsAvailable] = useState(0);
-  const [stampsToNextReward, setStampsToNextReward] = useState(STAMPS_PER_REWARD);
+  const [stampsToNextReward, setStampsToNextReward] = useState(stampsGoal);
   const [lastStampDate, setLastStampDate] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -18,7 +21,7 @@ export function LoyaltyProvider({ children }) {
     if (!isAuthenticated) {
       setStampsCount(0);
       setRewardsAvailable(0);
-      setStampsToNextReward(STAMPS_PER_REWARD);
+      setStampsToNextReward(stampsGoal);
       setLastStampDate(null);
       setError(null);
       setLoading(false);
@@ -31,7 +34,7 @@ export function LoyaltyProvider({ children }) {
       setStampsCount(data.stamps_count ?? 0);
       setRewardsAvailable(data.rewards_available ?? 0);
       setStampsToNextReward(
-        data.stamps_to_next_reward != null ? data.stamps_to_next_reward : STAMPS_PER_REWARD
+        data.stamps_to_next_reward != null ? data.stamps_to_next_reward : stampsGoal
       );
       setLastStampDate(data.last_stamp_date ?? null);
     } catch (e) {
@@ -39,7 +42,7 @@ export function LoyaltyProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [isAuthenticated, authFetch]);
+  }, [isAuthenticated, authFetch, stampsGoal]);
 
   useEffect(() => {
     fetchLoyaltyState();
@@ -54,7 +57,7 @@ export function LoyaltyProvider({ children }) {
       stampsCount,
       rewardsAvailable,
       stampsToNextReward,
-      stampsGoal: STAMPS_PER_REWARD,
+      stampsGoal,
       lastStampDate,
       loading,
       error,
@@ -66,6 +69,7 @@ export function LoyaltyProvider({ children }) {
       stampsCount,
       rewardsAvailable,
       stampsToNextReward,
+      stampsGoal,
       lastStampDate,
       loading,
       error,

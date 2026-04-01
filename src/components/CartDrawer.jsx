@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useAppConfig } from '../context/AppConfigContext';
 import { useLoyalty } from '../context/LoyaltyContext';
 import {
-  cartHasEligibleDrinkForReward,
   computeRewardDiscountPenceForCart,
 } from '../lib/loyaltyDiscount';
 import { loadStripe } from '@stripe/stripe-js';
@@ -34,6 +34,7 @@ import {
 } from '../lib/checkoutTheme';
 import { previewStampsEarnedForOrderTotal, penceNeededForNextStamp } from '../lib/loyaltyStampPreview';
 import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
+import { useRewardPricing } from './cart/useRewardPricing';
 
 const stepperBtn = checkoutStepperButtonStyle;
 
@@ -85,6 +86,7 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
     setApplyReward,
   } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
+  const { loyalty: loyaltyConfig, reward } = useAppConfig();
   const { rewardsAvailable } = useLoyalty();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -142,11 +144,15 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
   const newSubtotal = useMemo(() => newItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0), [newItems]);
 
   const isFreshStripeCheckout = addingToOrderId == null && editOrderId == null;
-  const eligibleForReward =
-    isFreshStripeCheckout &&
-    isAuthenticated &&
-    rewardsAvailable > 0 &&
-    cartHasEligibleDrinkForReward(items);
+  const { eligibleForReward, rewardDiscountPence } = useRewardPricing({
+    isFreshStripeCheckout,
+    isAuthenticated,
+    rewardsAvailable,
+    items,
+    applyReward,
+    rewardConfig: reward,
+    loyaltyConfig,
+  });
 
   useEffect(() => {
     if (!eligibleForReward) setApplyReward(false);
@@ -166,13 +172,7 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
     return `Add £${(need / 100).toFixed(2)} to earn a stamp (orders £2+).`;
   }, [isAuthenticated, isFreshStripeCheckout, items.length, subtotal]);
 
-  const rewardDiscountPence = useMemo(
-    () => (applyReward && eligibleForReward ? computeRewardDiscountPenceForCart(items) : 0),
-    [applyReward, eligibleForReward, items]
-  );
-
-  /** Matches cafe-orders default STRIPE_MIN_AMOUNT_PENCE */
-  const STRIPE_MIN_CHECKOUT_PENCE = 30;
+  const STRIPE_MIN_CHECKOUT_PENCE = loyaltyConfig?.stripeMinAmountPence ?? 30;
   const displayTotalPence = useMemo(() => {
     if (isFreshStripeCheckout && applyReward && rewardDiscountPence > 0) {
       return Math.max(0, subtotal - rewardDiscountPence);
@@ -1052,7 +1052,15 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
                             margin: '4px 0 0',
                             lineHeight: 1.35,
                           }}>
-                            Up to £{(computeRewardDiscountPenceForCart(items) / 100).toFixed(2)} off your cheapest drink
+                            Up to £
+                            {(
+                              computeRewardDiscountPenceForCart(
+                                items,
+                                loyaltyConfig?.rewardMaxPence,
+                                reward?.drinkCategorySlugs
+                              ) / 100
+                            ).toFixed(2)}{' '}
+                            off your cheapest drink
                             {rewardBelowStripeMin && applyReward
                               ? ` — add items so the total stays above £${(STRIPE_MIN_CHECKOUT_PENCE / 100).toFixed(2)}.`
                               : ''}

@@ -1,8 +1,41 @@
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
 const DEFAULT_MILKS = ['Full Fat', 'Regular'];
+/** @typedef {import('./types').CartLineItem} CartLineItem */
+/** @typedef {import('./types').ApiLineItem} ApiLineItem */
+
+function parseJsonSafe(res) {
+  return res.json().catch(() => ({}));
+}
+
+function pickErrorMessage(data, fallback) {
+  return data?.error || data?.reason || fallback;
+}
+
+async function expectApiSuccess(res, { fallbackError, allowLegacySuccess = false } = {}) {
+  const data = await parseJsonSafe(res);
+  const envelopeSuccess =
+    typeof data?.ok === 'boolean'
+      ? data.ok
+      : allowLegacySuccess && typeof data?.success === 'boolean'
+        ? data.success
+        : res.ok;
+
+  if (!res.ok || !envelopeSuccess) {
+    throw new Error(pickErrorMessage(data, fallbackError));
+  }
+  return data;
+}
+
+function generateIdempotencyKey(prefix) {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
 
 /** Build API line_items + modifiers from cart rows (checkout / PATCH). */
+/** @param {CartLineItem[]} cartItems @returns {ApiLineItem[]} */
 export function orderLineItemsFromCartItems(cartItems) {
   return cartItems.map((item) => {
     const mods = [];
@@ -27,28 +60,24 @@ export function orderLineItemsFromCartItems(cartItems) {
 export async function fetchModifierCategories() {
   const res = await fetch(`${BASE}/api/modifier-categories`);
   if (!res.ok) return [];
-  const data = await res.json().catch(() => ({}));
+  const data = await parseJsonSafe(res);
   return data.ok ? (data.categories ?? []) : [];
 }
 
 export async function fetchCatalogItems() {
   const res = await fetch(`${BASE}/api/catalog-items`);
-  if (!res.ok) throw new Error('Failed to load menu');
-  const data = await res.json();
-  if (!data.ok) throw new Error(data.error || 'Failed to load menu');
+  const data = await expectApiSuccess(res, { fallbackError: 'Failed to load menu' });
   return data.items ?? [];
 }
 
 export async function createIncrementalCheckoutSession(authFetch, body) {
+  const idempotencyKey = generateIdempotencyKey('incr');
   const res = await authFetch(`${BASE}/api/stripe/create-incremental-checkout`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idempotencyKey },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || data.reason || 'Could not start add-on checkout');
-  }
+  const data = await expectApiSuccess(res, { fallbackError: 'Could not start add-on checkout' });
   return { sessionId: data.sessionId, url: data.url, difference: data.difference };
 }
 
@@ -56,58 +85,55 @@ export async function cancelCustomerOrder(authFetch, orderId) {
   const res = await authFetch(`${BASE}/api/customer/orders/${encodeURIComponent(orderId)}/cancel`, {
     method: 'POST',
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    const err = new Error(data.error || data.reason || 'Could not cancel order');
-    throw err;
-  }
-  return data;
+  return expectApiSuccess(res, { fallbackError: 'Could not cancel order' });
 }
 
 export async function fetchCustomerLoyalty(authFetch) {
   const res = await authFetch(`${BASE}/api/customer/loyalty`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to load loyalty');
-  }
-  return data;
+  return expectApiSuccess(res, { fallbackError: 'Failed to load loyalty' });
 }
 
 export async function fetchCustomerRewards(authFetch) {
   const res = await authFetch(`${BASE}/api/customer/rewards`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to load rewards');
-  }
-  return data;
+  return expectApiSuccess(res, { fallbackError: 'Failed to load rewards' });
+}
+
+export async function fetchCustomerConfig(authFetch) {
+  const res = await authFetch(`${BASE}/api/customer/config`);
+  return expectApiSuccess(res, { fallbackError: 'Failed to load customer config' });
 }
 
 export async function createCheckoutSession(authFetch, body) {
+  const idempotencyKey = generateIdempotencyKey('checkout');
   const res = await authFetch(`${BASE}/api/stripe/create-checkout-session`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idempotencyKey },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Could not start checkout');
-  }
+  const data = await expectApiSuccess(res, { fallbackError: 'Could not start checkout' });
   return { sessionId: data.sessionId, url: data.url };
 }
 
 export async function fetchOrderByCheckoutSession(authFetch, sessionId) {
   const q = new URLSearchParams({ session_id: sessionId });
   const res = await authFetch(`${BASE}/api/customer/order-by-checkout-session?${q}`);
-  const data = await res.json().catch(() => ({}));
+  const data = await parseJsonSafe(res);
   if (res.status === 404) {
     const err = new Error('Not ready');
     err.code = 'NOT_READY';
     throw err;
   }
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to load order');
-  }
+  if (!res.ok || !data.ok) throw new Error(pickErrorMessage(data, 'Failed to load order'));
   return data.order;
+}
+
+export async function finalizeCheckoutSession(authFetch, sessionId) {
+  const res = await authFetch(`${BASE}/api/stripe/finalize-checkout-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return expectApiSuccess(res, { fallbackError: 'Could not finalize checkout session' });
 }
 
 export async function submitOrder(
@@ -125,10 +151,7 @@ export async function submitOrder(
       allergens,
     }),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to place order');
-  }
+  const data = await expectApiSuccess(res, { fallbackError: 'Failed to place order' });
   return data;
 }
 
@@ -138,19 +161,13 @@ export async function fetchCustomerOrders(authFetch, { status, days } = {}) {
   if (days != null && days !== '') params.set('days', String(days));
   const q = params.toString() ? `?${params.toString()}` : '';
   const res = await authFetch(`${BASE}/api/customer/orders${q}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to load orders');
-  }
+  const data = await expectApiSuccess(res, { fallbackError: 'Failed to load orders' });
   return data.orders ?? [];
 }
 
 export async function fetchCustomerOrder(authFetch, orderId) {
   const res = await authFetch(`${BASE}/api/customer/orders/${encodeURIComponent(orderId)}`);
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to load order');
-  }
+  const data = await expectApiSuccess(res, { fallbackError: 'Failed to load order' });
   return data.order;
 }
 
@@ -160,10 +177,7 @@ export async function updateCustomerOrder(authFetch, orderId, body) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.ok) {
-    throw new Error(data.error || 'Failed to update order');
-  }
+  const data = await expectApiSuccess(res, { fallbackError: 'Failed to update order' });
   return data.order;
 }
 
@@ -184,10 +198,10 @@ export async function submitOrderFeedback(fetchImpl, body) {
       comment: body.comment ?? '',
     }),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Could not send feedback');
-  }
+  const data = await expectApiSuccess(res, {
+    fallbackError: 'Could not send feedback',
+    allowLegacySuccess: true,
+  });
   return {
     shouldShowGooglePrompt: Boolean(data.shouldShowGooglePrompt),
     googleReviewUrl: data.googleReviewUrl || GOOGLE_REVIEW_PLACE_URL,
