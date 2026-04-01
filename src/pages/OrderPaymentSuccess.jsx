@@ -4,6 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useLoyalty } from '../context/LoyaltyContext';
 import { fetchOrderByCheckoutSession, finalizeCheckoutSession } from '../lib/api';
+import {
+  buildActiveOrderSnapshotFromApiOrder,
+  pickupMinutesFromOrderForSuccess,
+} from '../lib/orderViewModels';
 import OrderSuccess from '../components/OrderSuccess';
 import SignInButton from '../components/SignInButton';
 import {
@@ -11,34 +15,6 @@ import {
   CHECKOUT_PRIMARY_SHADOW,
   CHECKOUT_PRIMARY_TEXT,
 } from '../lib/checkoutTheme';
-
-function pickupMinutesFromOrder(order) {
-  if (!order?.pickup_time) return 15;
-  const ms = new Date(order.pickup_time).getTime() - Date.now();
-  return Math.max(0, Math.round(ms / 60000));
-}
-
-/** Full snapshot for Home gold card + KDS-complete matching (minimal { dbOrderId } breaks after server list clears). */
-function activeOrderSnapshotFromApiOrder(o) {
-  if (!o?.id) return null;
-  const total = Number(o.total_amount);
-  return {
-    dbOrderId: o.id,
-    orderId: o.id,
-    squareOrderId: o.square_order_id,
-    total: Number.isFinite(total) ? total : 0,
-    pickupMinutes: pickupMinutesFromOrder(o),
-    placedAt: Date.now(),
-    items: (o.items || []).map((it) => ({
-      name: it.item_name,
-      emoji: it.item_emoji || '☕',
-      quantity: it.quantity,
-      totalPrice: it.unit_price,
-      size: 'Regular',
-      milk: 'Full Fat',
-    })),
-  };
-}
 
 export default function OrderPaymentSuccess() {
   const [searchParams] = useSearchParams();
@@ -84,7 +60,7 @@ export default function OrderPaymentSuccess() {
           if (incremental) {
             clearAddingToOrder();
           }
-          setActiveOrder(activeOrderSnapshotFromApiOrder(o));
+          setActiveOrder(buildActiveOrderSnapshotFromApiOrder(o));
         }
       } catch (e) {
         if (cancelled) return;
@@ -213,7 +189,7 @@ export default function OrderPaymentSuccess() {
     <div className="relative w-full min-h-[100dvh] flex-1">
       <OrderSuccess
         variant="placed"
-        pickupMinutes={pickupMinutesFromOrder(order)}
+        pickupMinutes={pickupMinutesFromOrderForSuccess(order)}
         onDone={handleDone}
         stampPreviewTotalPence={order?.total_amount != null ? Number(order.total_amount) : undefined}
       />

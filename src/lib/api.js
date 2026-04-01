@@ -1,31 +1,10 @@
+import { parseJsonSafe, pickErrorMessage, expectApiSuccess } from './apiEnvelope.js';
+
 const BASE = import.meta.env.VITE_API_URL ?? '';
 
 const DEFAULT_MILKS = ['Full Fat', 'Regular'];
 /** @typedef {import('./types').CartLineItem} CartLineItem */
 /** @typedef {import('./types').ApiLineItem} ApiLineItem */
-
-function parseJsonSafe(res) {
-  return res.json().catch(() => ({}));
-}
-
-function pickErrorMessage(data, fallback) {
-  return data?.error || data?.reason || fallback;
-}
-
-async function expectApiSuccess(res, { fallbackError, allowLegacySuccess = false } = {}) {
-  const data = await parseJsonSafe(res);
-  const envelopeSuccess =
-    typeof data?.ok === 'boolean'
-      ? data.ok
-      : allowLegacySuccess && typeof data?.success === 'boolean'
-        ? data.success
-        : res.ok;
-
-  if (!res.ok || !envelopeSuccess) {
-    throw new Error(pickErrorMessage(data, fallbackError));
-  }
-  return data;
-}
 
 function generateIdempotencyKey(prefix) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -118,7 +97,7 @@ export async function fetchOrderByCheckoutSession(authFetch, sessionId) {
   const q = new URLSearchParams({ session_id: sessionId });
   const res = await authFetch(`${BASE}/api/customer/order-by-checkout-session?${q}`);
   const data = await parseJsonSafe(res);
-  if (res.status === 404) {
+  if (res.status === 404 || res.status === 202 || data?.code === 'NOT_READY') {
     const err = new Error('Not ready');
     err.code = 'NOT_READY';
     throw err;
@@ -198,10 +177,7 @@ export async function submitOrderFeedback(fetchImpl, body) {
       comment: body.comment ?? '',
     }),
   });
-  const data = await expectApiSuccess(res, {
-    fallbackError: 'Could not send feedback',
-    allowLegacySuccess: true,
-  });
+  const data = await expectApiSuccess(res, { fallbackError: 'Could not send feedback' });
   return {
     shouldShowGooglePrompt: Boolean(data.shouldShowGooglePrompt),
     googleReviewUrl: data.googleReviewUrl || GOOGLE_REVIEW_PLACE_URL,

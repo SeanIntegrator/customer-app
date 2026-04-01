@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { buildHomeGoldCardModel } from '../lib/orderViewModels';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PROMOTIONS } from '../data/mock';
@@ -6,7 +7,6 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { useLoyalty } from '../context/LoyaltyContext';
 import { initialsFromName, formatMemberSince } from '../lib/userDisplay';
-import { remainingMinutesUntilPickup } from '../lib/pickup';
 import EditOrderModal from '../components/EditOrderModal';
 import CancellationModal from '../components/CancellationModal';
 import OrderCancelledSuccess from '../components/OrderCancelledSuccess';
@@ -122,40 +122,10 @@ export default function Home() {
     };
   }, [subscribe]);
 
-  const goldCardModel = (() => {
-    if (serverLiveOrder) {
-      return {
-        id: serverLiveOrder.id,
-        status: serverLiveOrder.status,
-        total_amount: serverLiveOrder.total_amount,
-        pickupMinutes: remainingMinutesUntilPickup(serverLiveOrder.pickup_time),
-        items: (serverLiveOrder.items || []).map((it) => ({
-          name: it.item_name,
-          emoji: it.item_emoji || '☕',
-          quantity: it.quantity,
-          totalPrice: it.unit_price,
-          size: 'Regular',
-          milk: 'Full Fat',
-        })),
-        editable: serverLiveOrder.status === 'pending' || serverLiveOrder.status === 'confirmed',
-        is_paid_via_stripe: Boolean(serverLiveOrder.is_paid_via_stripe),
-      };
-    }
-    if (activeOrder && (activeOrder.orderId != null || activeOrder.dbOrderId != null)) {
-      const id = activeOrder.dbOrderId ?? activeOrder.orderId;
-      const at = Number(activeOrder.total);
-      return {
-        id,
-        status: 'confirmed',
-        total_amount: Number.isFinite(at) ? at : 0,
-        pickupMinutes: activeOrder.pickupMinutes ?? 10,
-        items: activeOrder.items || [],
-        editable: true,
-        is_paid_via_stripe: true,
-      };
-    }
-    return null;
-  })();
+  const goldCardModel = useMemo(
+    () => buildHomeGoldCardModel(serverLiveOrder, activeOrder),
+    [serverLiveOrder, activeOrder]
+  );
 
   const pendingStampEarnCount = useMemo(() => {
     const ta = goldCardModel?.total_amount;

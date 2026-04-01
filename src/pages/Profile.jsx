@@ -12,51 +12,15 @@ import { findUsualOrderFromHistory, apiOrderItemsToCartLines } from '../lib/usua
 import SignInButton from '../components/SignInButton';
 import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 import { StarRating, SectionHead } from './profile/ProfilePieces';
-
-const GRAIN = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E")`;
-
-const EVENT_GRADIENTS = [
-  'linear-gradient(148deg, #a04820 0%, #c87040 55%, #e09858 100%)',
-  'linear-gradient(148deg, #2a0812 0%, #5a1428 55%, #782038 100%)',
-  'linear-gradient(148deg, #7a5008 0%, #a87020 55%, #c89038 100%)',
-  'linear-gradient(148deg, #4a2810 0%, #7a4820 55%, #a06830 100%)',
-];
-
-// ── PAGE ─────────────────────────────────────────────────────────────────
-
-function formatHistoryOrderDate(iso) {
-  if (!iso) return '';
-  try {
-    return new Date(iso).toLocaleDateString('en-GB', {
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return '';
-  }
-}
-
-function orderSummaryLine(order) {
-  const items = order.items || [];
-  return items.map((it) => (it.quantity > 1 ? `${it.quantity}× ` : '') + (it.item_name || 'Item')).join(', ');
-}
-
-function startOfWeekMonday(ref) {
-  const x = new Date(ref);
-  const day = x.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  x.setDate(x.getDate() + diff);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
-
-function startOfCalendarMonth(ref) {
-  return new Date(ref.getFullYear(), ref.getMonth(), 1, 0, 0, 0, 0);
-}
-
-const ORDERS_PAGE_SIZE = 6;
+import ProfileHeroBand from './profile/ProfileHeroBand';
+import ProfileOrderHistorySection from './profile/ProfileOrderHistorySection';
+import {
+  PROFILE_GRAIN,
+  EVENT_GRADIENTS,
+  ORDERS_PAGE_SIZE,
+  startOfWeekMonday,
+  startOfCalendarMonth,
+} from '../lib/profileUtils';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -190,161 +154,19 @@ export default function Profile() {
       className="h-full overflow-y-auto scrollbar-hide"
       style={{ background: '#f0e6d0' }}
     >
-      {/* ── HERO BAND ───────────────────────────────────────────────── */}
-      <div style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)', paddingTop: 48, paddingBottom: 36 }}>
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: GRAIN, pointerEvents: 'none' }} />
-
-        {/* Amber glow */}
-        <motion.div
-          style={{ position: 'absolute', top: -80, right: -80, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(210,150,40,0.22) 0%, transparent 65%)', pointerEvents: 'none' }}
-          animate={{ scale: [1, 1.2, 1], opacity: [0.6, 1, 0.6] }}
-          transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        {/* Green glow */}
-        <motion.div
-          style={{ position: 'absolute', bottom: -60, left: -60, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(60,120,60,0.18) 0%, transparent 65%)', pointerEvents: 'none' }}
-          animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.8, 0.4] }}
-          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
-        />
-
-        {/* Decorative concentric rings — like coffee ripples */}
-        <svg style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} preserveAspectRatio="xMaxYMid slice">
-          {[48, 88, 130, 174, 222].map((r, i) => (
-            <circle key={i} cx="105%" cy="52%" r={r} fill="none" stroke="white" strokeWidth="0.7" opacity={0.045 + i * 0.008} strokeDasharray={i % 2 === 0 ? '6 5' : 'none'} />
-          ))}
-        </svg>
-
-        {/* Botanical frond */}
-        <motion.div
-          style={{ position: 'absolute', right: '8%', top: -10, opacity: 0.24, pointerEvents: 'none', transformOrigin: '50% 100%' }}
-          animate={{ rotate: [-5, 5, -5] }}
-          transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <svg width={44} height={105} viewBox="0 0 50 120" fill="none">
-            <path d="M25 118 C25 100 25 15 25 4" stroke="#6aaa6a" strokeWidth="1.4" strokeLinecap="round" />
-            {[22, 40, 58, 76, 94].map((cy, i) => {
-              const w = 22 - i * 2;
-              return (
-                <g key={i}>
-                  <path
-                    d={`M25 ${cy} C${25 - w} ${cy - 10} ${25 - w - 8} ${cy} ${25 - w - 2} ${cy + 10} C${25 - 6} ${cy + 14} ${25 - 3} ${cy + 5} 25 ${cy}`}
-                    fill="#4a8a4a"
-                    opacity={0.75 - i * 0.09}
-                  />
-                  <path
-                    d={`M25 ${cy} C${25 + w} ${cy - 10} ${25 + w + 8} ${cy} ${25 + w + 2} ${cy + 10} C${25 + 6} ${cy + 14} ${25 + 3} ${cy + 5} 25 ${cy}`}
-                    fill="#4a8a4a"
-                    opacity={0.68 - i * 0.09}
-                  />
-                </g>
-              );
-            })}
-          </svg>
-        </motion.div>
-
-        <div style={{ position: 'relative', padding: '0 22px' }}>
-          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.26em', textTransform: 'uppercase', color: '#c8902a', marginBottom: 18 }}>
-            ✦ Your profile
-          </p>
-
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 22 }}>
-            {/* Avatar */}
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: 'spring', stiffness: 280, damping: 22, delay: 0.08 }}
-              style={{
-                width: 68,
-                height: 68,
-                borderRadius: '50%',
-                background: user?.avatarUrl ? 'transparent' : 'linear-gradient(140deg, #c8902a 0%, #deb040 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontFamily: 'Fraunces, Georgia, serif',
-                fontSize: 28,
-                fontWeight: 900,
-                color: '#122012',
-                boxShadow: '0 0 0 3px rgba(200,144,42,0.25), 0 6px 24px rgba(200,144,42,0.3)',
-                flexShrink: 0,
-                overflow: 'hidden',
-              }}
-            >
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                profileInitials
-              )}
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: -16 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.12, type: 'spring', stiffness: 300, damping: 28 }}
-            >
-              <h1 style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 42, fontWeight: 900, color: '#f0e6d0', letterSpacing: '-0.035em', lineHeight: 0.95, marginBottom: 6 }}>
-                {heroFirstName}
-              </h1>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(240,230,208,0.5)' }}>
-                {isAuthenticated
-                  ? memberSinceLabel
-                    ? `Member since ${memberSinceLabel} · ${orderCount} order${orderCount === 1 ? '' : 's'}`
-                    : `${orderCount} order${orderCount === 1 ? '' : 's'} with Clay & Bean`
-                  : 'Sign in with Google to sync orders and rewards'}
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Stat pills */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            style={{ display: 'flex', gap: 8 }}
-          >
-            {[
-              { label: 'Orders', value: isAuthenticated ? String(orderCount) : '—' },
-              {
-                label: 'Stamps',
-                value: isAuthenticated ? (loyaltyLoading ? '…' : `${stampsCount}/${stampsGoal}`) : '—',
-              },
-              { label: 'Events', value: String(eventsEngagementCount) },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 100, padding: '7px 14px', display: 'flex', alignItems: 'center', gap: 7 }}>
-                <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#f0e6d0' }}>{value}</span>
-                <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 600, color: 'rgba(240,230,208,0.45)', letterSpacing: '0.04em' }}>{label}</span>
-              </div>
-            ))}
-          </motion.div>
-
-          {isAuthenticated && (
-            <motion.button
-              type="button"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.28 }}
-              onClick={() => logout()}
-              style={{
-                marginTop: 16,
-                alignSelf: 'flex-start',
-                background: 'rgba(255,255,255,0.08)',
-                border: '1px solid rgba(255,255,255,0.15)',
-                borderRadius: 100,
-                padding: '8px 16px',
-                fontFamily: 'Plus Jakarta Sans, sans-serif',
-                fontSize: 11,
-                fontWeight: 700,
-                color: 'rgba(240,230,208,0.65)',
-                cursor: 'pointer',
-                letterSpacing: '0.04em',
-              }}
-            >
-              Sign out
-            </motion.button>
-          )}
-        </div>
-      </div>
-
+      <ProfileHeroBand
+        user={user}
+        profileInitials={profileInitials}
+        heroFirstName={heroFirstName}
+        memberSinceLabel={memberSinceLabel}
+        orderCount={orderCount}
+        isAuthenticated={isAuthenticated}
+        loyaltyLoading={loyaltyLoading}
+        stampsCount={stampsCount}
+        stampsGoal={stampsGoal}
+        eventsEngagementCount={eventsEngagementCount}
+        logout={logout}
+      />
       {/* ── PAGE BODY ─────────────────────────────────────────────── */}
       <div style={{ padding: '32px 18px 72px', display: 'flex', flexDirection: 'column', gap: 36 }}>
 
@@ -491,7 +313,7 @@ export default function Profile() {
 
           <div style={{ background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)', borderRadius: 24, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)', border: '1.5px solid #e0d0b0' }}>
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'absolute', inset: 0, backgroundImage: GRAIN, pointerEvents: 'none', opacity: 0.3 }} />
+              <div style={{ position: 'absolute', inset: 0, backgroundImage: PROFILE_GRAIN, pointerEvents: 'none', opacity: 0.3 }} />
 
               {/* Card header row */}
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px', borderBottom: '1px solid rgba(26,46,26,0.08)' }}>
@@ -757,211 +579,20 @@ export default function Profile() {
           </motion.section>
         )}
 
-        {/* ── ORDER HISTORY ────────────────────────────────────────── */}
-        <motion.section
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3, type: 'spring', stiffness: 260, damping: 28 }}
-        >
-          <SectionHead label="History" title="Past orders" />
-
-          {!isAuthenticated ? (
-            <div style={{ background: 'rgba(255,255,255,0.45)', border: '1.5px solid #e0d0b0', borderRadius: 18, padding: '22px 18px', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: '#1a2e1a', margin: '0 0 8px' }}>Sign in to see your order history</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', margin: '0 0 14px', lineHeight: 1.45 }}>
-                Your completed orders from Clay & Bean will appear here.
-              </p>
-              <SignInButton />
-            </div>
-          ) : ordersLoading ? (
-            <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#8a7868' }}>Loading history…</div>
-          ) : completedOrders.length === 0 ? (
-            <div style={{ background: 'rgba(255,255,255,0.4)', border: '1.5px dashed #d4c0a0', borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: 'rgba(26,46,26,0.45)', marginBottom: 4 }}>No past orders yet</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.35)' }}>When you complete an order, it will show up here.</p>
-            </div>
-          ) : (
-            <>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
-                {[
-                  { id: 'week', label: 'This week' },
-                  { id: 'month', label: 'This month' },
-                  { id: 'all', label: 'All time' },
-                ].map(({ id, label }) => {
-                  const active = ordersHorizon === id;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => setOrdersHorizon(id)}
-                      style={{
-                        fontFamily: 'Plus Jakarta Sans, sans-serif',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        padding: '8px 14px',
-                        borderRadius: 100,
-                        border: active ? '1.5px solid #c8902a' : '1.5px solid #d4c0a0',
-                        background: active ? 'rgba(200,144,42,0.18)' : 'rgba(255,255,255,0.45)',
-                        color: active ? '#1a2e1a' : 'rgba(26,46,26,0.55)',
-                        cursor: 'pointer',
-                        letterSpacing: '0.02em',
-                      }}
-                    >
-                      {label}
-                    </button>
-                  );
-                })}
-              </div>
-              {filteredCompletedOrders.length === 0 ? (
-                <div style={{ background: 'rgba(255,255,255,0.4)', border: '1.5px dashed #d4c0a0', borderRadius: 18, padding: '20px 18px', textAlign: 'center' }}>
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: 'rgba(26,46,26,0.5)', margin: 0, lineHeight: 1.45 }}>
-                    {ordersHorizon === 'week'
-                      ? 'No orders this week. Try this month or all time.'
-                      : ordersHorizon === 'month'
-                        ? 'No orders this month. Try all time.'
-                        : 'No orders in this range.'}
-                  </p>
-                </div>
-              ) : (
-            <>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {paginatedCompletedOrders.map((order, idx) => (
-                <motion.div
-                  key={order.id}
-                  layout
-                  style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 18, overflow: 'hidden' }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
-                    style={{ width: '100%', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', gap: 12 }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'rgba(26,46,26,0.07)', border: '1.5px solid #d4c0a0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 11, fontWeight: 800, color: 'rgba(26,46,26,0.4)' }}>
-                          {filteredCompletedOrders.length - (ordersPage * ORDERS_PAGE_SIZE + idx)}
-                        </span>
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
-                          {formatHistoryOrderDate(order.created_at)}
-                        </p>
-                        <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {orderSummaryLine(order)}
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                      <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 800, color: '#1a2e1a' }}>
-                        £{(order.total_amount / 100).toFixed(2)}
-                      </span>
-                      <motion.span
-                        animate={{ rotate: expandedOrder === order.id ? 180 : 0 }}
-                        transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-                        style={{ display: 'inline-block', color: 'rgba(26,46,26,0.35)', fontSize: 12 }}
-                      >
-                        ↓
-                      </motion.span>
-                    </div>
-                  </button>
-
-                  <AnimatePresence>
-                    {expandedOrder === order.id && (
-                      <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.22, ease: 'easeInOut' }}
-                        style={{ overflow: 'hidden' }}
-                      >
-                        <div style={{ borderTop: '1px solid rgba(26,46,26,0.08)', padding: '12px 16px 14px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-                            {(order.items || []).map((line) => (
-                              <div key={line.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#c8902a', flexShrink: 0 }} />
-                                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#1a2e1a' }}>
-                                  {line.quantity > 1 ? `${line.quantity}× ` : ''}
-                                  {line.item_name}
-                                </p>
-                              </div>
-                            ))}
-                          </div>
-                          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, color: 'rgba(26,46,26,0.3)', letterSpacing: '0.06em' }}>
-                            Order #{order.id}
-                            {order.square_order_id ? ` · ${order.square_order_id}` : ''}
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              ))}
-            </div>
-            {filteredCompletedOrders.length > ORDERS_PAGE_SIZE ? (
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginTop: 14,
-                  gap: 12,
-                  flexWrap: 'wrap',
-                }}
-              >
-                <button
-                  type="button"
-                  disabled={ordersPage <= 0}
-                  onClick={() => setOrdersPage((p) => Math.max(0, p - 1))}
-                  style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    padding: '8px 14px',
-                    borderRadius: 100,
-                    border: '1.5px solid #d4c0a0',
-                    background: ordersPage <= 0 ? 'rgba(26,46,26,0.06)' : 'rgba(255,255,255,0.5)',
-                    color: ordersPage <= 0 ? 'rgba(26,46,26,0.35)' : '#1a2e1a',
-                    cursor: ordersPage <= 0 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  Previous
-                </button>
-                <span
-                  style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'rgba(26,46,26,0.5)',
-                  }}
-                >
-                  Page {ordersPage + 1} of {ordersPageCount}
-                </span>
-                <button
-                  type="button"
-                  disabled={ordersPage >= ordersPageCount - 1}
-                  onClick={() => setOrdersPage((p) => Math.min(ordersPageCount - 1, p + 1))}
-                  style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    padding: '8px 14px',
-                    borderRadius: 100,
-                    border: '1.5px solid #d4c0a0',
-                    background: ordersPage >= ordersPageCount - 1 ? 'rgba(26,46,26,0.06)' : 'rgba(255,255,255,0.5)',
-                    color: ordersPage >= ordersPageCount - 1 ? 'rgba(26,46,26,0.35)' : '#1a2e1a',
-                    cursor: ordersPage >= ordersPageCount - 1 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  Next
-                </button>
-              </div>
-            ) : null}
-            </>
-              )}
-            </>
-          )}
-        </motion.section>
-
+        <ProfileOrderHistorySection
+          isAuthenticated={isAuthenticated}
+          ordersLoading={ordersLoading}
+          completedOrders={completedOrders}
+          ordersHorizon={ordersHorizon}
+          setOrdersHorizon={setOrdersHorizon}
+          filteredCompletedOrders={filteredCompletedOrders}
+          paginatedCompletedOrders={paginatedCompletedOrders}
+          expandedOrder={expandedOrder}
+          setExpandedOrder={setExpandedOrder}
+          ordersPage={ordersPage}
+          setOrdersPage={setOrdersPage}
+          ordersPageCount={ordersPageCount}
+        />
         {/* ── EVENTS YOU ATTENDED (derived from bookings that have passed) ── */}
         {attendedEvents.length > 0 ? (
           <motion.section

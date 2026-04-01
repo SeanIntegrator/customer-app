@@ -1,5 +1,8 @@
 import { useLocation } from 'react-router-dom';
 import GoogleOneTap from './GoogleOneTap';
+import { useAuth } from '../context/AuthContext';
+
+const ENABLE_ONE_TAP = String(import.meta.env.VITE_ENABLE_GOOGLE_ONE_TAP || '').toLowerCase() === 'true';
 
 /**
  * One Tap + GoogleLogin both touch GSI; hide One Tap under /order (menu + checkout return)
@@ -7,7 +10,8 @@ import GoogleOneTap from './GoogleOneTap';
  */
 export default function GoogleOneTapGate() {
   const { pathname } = useLocation();
-  if (pathname.startsWith('/order')) {
+  const { isAuthenticated, loading } = useAuth();
+  if (!ENABLE_ONE_TAP || loading || isAuthenticated || pathname.startsWith('/order')) {
     return null;
   }
   return <GoogleOneTap />;
