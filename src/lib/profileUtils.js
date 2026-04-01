@@ -27,7 +27,9 @@ export function formatHistoryOrderDate(iso) {
 
 export function orderSummaryLine(order) {
   const items = order.items || [];
-  return items.map((it) => (it.quantity > 1 ? `${it.quantity}× ` : '') + (it.item_name || 'Item')).join(', ');
+  return items
+    .map((it) => (it.quantity > 1 ? `${it.quantity}× ` : '') + (it.item_name || 'Item'))
+    .join(', ');
 }
 
 export function startOfWeekMonday(ref) {

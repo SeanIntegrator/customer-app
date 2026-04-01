@@ -21,17 +21,11 @@ export default function OrderHub() {
 
   return (
     <div className="scrollbar-hide" style={{ padding: '16px 16px 96px' }}>
-      {loading && (
-        <MenuLoadingPanel />
-      )}
+      {loading && <MenuLoadingPanel />}
 
-      {error && !loading && (
-        <MenuErrorPanel />
-      )}
+      {error && !loading && <MenuErrorPanel />}
 
-      {!loading && !error && visibleCategories.length === 0 && (
-        <MenuEmptyPanel />
-      )}
+      {!loading && !error && visibleCategories.length === 0 && <MenuEmptyPanel />}
 
       {!loading && !error && visibleCategories.length > 0 && (
         <motion.div layout style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -70,7 +64,14 @@ export default function OrderHub() {
               >
                 {cat.label}
               </span>
-              <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 600, color: '#6a5a48' }}>
+              <span
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: '#6a5a48',
+                }}
+              >
                 {countsBySlug[cat.slug]} items
               </span>
             </motion.button>

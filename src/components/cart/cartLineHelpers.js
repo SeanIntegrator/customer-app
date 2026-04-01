@@ -17,7 +17,8 @@ export function lineMetaCaption(item) {
       !['Full Fat', 'Regular'].includes(item.milk) && item.milk,
       item.syrup,
       ...(item.alterations ?? []),
-    ].filter(Boolean).join(', ') ||
-    ((item.showDrinkModifiers ?? item.showCoffeeOptions) ? 'Regular' : null)
+    ]
+      .filter(Boolean)
+      .join(', ') || ((item.showDrinkModifiers ?? item.showCoffeeOptions) ? 'Regular' : null)
   );
 }

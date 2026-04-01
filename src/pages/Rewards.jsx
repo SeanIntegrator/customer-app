@@ -74,23 +74,57 @@ export default function Rewards() {
         </button>
 
         <h1 style={headStyle}>Your rewards</h1>
-        <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: 'rgba(26,46,26,0.5)', margin: '0 0 28px', lineHeight: 1.45 }}>
-          Free drinks earned from your stamp card. Apply one at checkout when your basket includes a drink.
+        <p
+          style={{
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+            fontSize: 13,
+            color: 'rgba(26,46,26,0.5)',
+            margin: '0 0 28px',
+            lineHeight: 1.45,
+          }}
+        >
+          Free drinks earned from your stamp card. Apply one at checkout when your basket includes a
+          drink.
         </p>
 
         {!isAuthenticated && !authLoading ? (
-          <div style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 20, padding: '24px 20px', textAlign: 'center' }}>
-            <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#1a2e1a', margin: '0 0 14px' }}>Sign in to see rewards</p>
+          <div
+            style={{
+              background: 'linear-gradient(148deg, #fef9f0, #f5ead8)',
+              border: '1.5px solid #e0d0b0',
+              borderRadius: 20,
+              padding: '24px 20px',
+              textAlign: 'center',
+            }}
+          >
+            <p
+              style={{
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: 14,
+                color: '#1a2e1a',
+                margin: '0 0 14px',
+              }}
+            >
+              Sign in to see rewards
+            </p>
             <SignInButton />
           </div>
         ) : null}
 
         {isAuthenticated && loading ? (
-          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#8a7868' }}>Loading…</p>
+          <p
+            style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#8a7868' }}
+          >
+            Loading…
+          </p>
         ) : null}
 
         {error ? (
-          <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#b34a2a' }}>{error}</p>
+          <p
+            style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: '#b34a2a' }}
+          >
+            {error}
+          </p>
         ) : null}
 
         {data && isAuthenticated ? (
@@ -109,24 +143,56 @@ export default function Rewards() {
                       boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
                     }}
                   >
-                    <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 800, color: '#1a2e1a', margin: '0 0 4px' }}>
+                    <p
+                      style={{
+                        fontFamily: 'Fraunces, Georgia, serif',
+                        fontSize: 18,
+                        fontWeight: 800,
+                        color: '#1a2e1a',
+                        margin: '0 0 4px',
+                      }}
+                    >
                       Free drink ☕
                     </p>
-                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.5)', margin: 0 }}>
-                      Up to £{((r.max_value ?? r.value ?? 0) / 100).toFixed(2)} off · use at checkout
+                    <p
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 12,
+                        color: 'rgba(26,46,26,0.5)',
+                        margin: 0,
+                      }}
+                    >
+                      Up to £{((r.max_value ?? r.value ?? 0) / 100).toFixed(2)} off · use at
+                      checkout
                     </p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: 'rgba(26,46,26,0.45)', marginBottom: 32 }}>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 14,
+                  color: 'rgba(26,46,26,0.45)',
+                  marginBottom: 32,
+                }}
+              >
                 No rewards yet — keep ordering to fill your stamp card.
               </p>
             )}
 
             <h2 style={{ ...headStyle, fontSize: 17, marginBottom: 12 }}>Reward history</h2>
             {data.recent_redemptions?.length ? (
-              <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <ul
+                style={{
+                  listStyle: 'none',
+                  padding: 0,
+                  margin: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                }}
+              >
                 {data.recent_redemptions.map((row, idx) => {
                   const dateStr = row.redeemed_at
                     ? new Date(row.redeemed_at).toLocaleDateString('en-GB', {
@@ -136,7 +202,8 @@ export default function Rewards() {
                         year: 'numeric',
                       })
                     : '';
-                  const bottomLine = [row.item_name, dateStr].filter(Boolean).join(' · ') || dateStr || 'Redeemed';
+                  const bottomLine =
+                    [row.item_name, dateStr].filter(Boolean).join(' · ') || dateStr || 'Redeemed';
                   return (
                     <li
                       key={`${row.order_id}-${row.redeemed_at}-${idx}`}
@@ -150,7 +217,15 @@ export default function Rewards() {
                         filter: 'saturate(0.65)',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          marginBottom: 6,
+                        }}
+                      >
                         <p
                           style={{
                             fontFamily: 'Fraunces, Georgia, serif',
@@ -182,7 +257,15 @@ export default function Rewards() {
                 })}
               </ul>
             ) : (
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 14, color: 'rgba(26,46,26,0.45)' }}>No redemptions yet.</p>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 14,
+                  color: 'rgba(26,46,26,0.45)',
+                }}
+              >
+                No redemptions yet.
+              </p>
             )}
           </>
         ) : null}

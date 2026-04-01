@@ -147,7 +147,8 @@ export default function Home() {
   const basketUnpaidQty = unpaidBasketQuantity(cartItems, editOrderId, addingToOrderId);
 
   const displayName = user?.displayName ?? 'Guest';
-  const heroFirstName = isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Welcome.';
+  const heroFirstName =
+    isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Welcome.';
   const profileInitials = user ? initialsFromName(user.displayName) : '?';
 
   const closeCancelSuccess = useCallback(() => {
@@ -155,8 +156,10 @@ export default function Home() {
     navigate('/');
   }, [navigate]);
 
-  const { sheetMotionProps: cancelSuccessSheetMotion, onGreenHeaderPointerDown: cancelSuccessHeaderDrag } =
-    useSheetSwipeToClose(closeCancelSuccess);
+  const {
+    sheetMotionProps: cancelSuccessSheetMotion,
+    onGreenHeaderPointerDown: cancelSuccessHeaderDrag,
+  } = useSheetSwipeToClose(closeCancelSuccess);
 
   return (
     <motion.div
@@ -179,10 +182,14 @@ export default function Home() {
         loyaltyRewardsAvailable={isAuthenticated ? loyalty.rewardsAvailable : 0}
         loyaltyLoading={Boolean(isAuthenticated && loyalty.loading)}
         isAuthenticated={isAuthenticated}
-        pendingStampEarnCount={goldCardModel != null && !bridgingCtaLoading ? pendingStampEarnCount : 0}
+        pendingStampEarnCount={
+          goldCardModel != null && !bridgingCtaLoading ? pendingStampEarnCount : 0
+        }
         hidePromotionalChips={goldCardModel != null && !bridgingCtaLoading}
-        orderCount={isAuthenticated ? user?.orderCount ?? 0 : null}
-        memberSinceLabel={isAuthenticated && user?.createdAt ? formatMemberSince(user.createdAt) : null}
+        orderCount={isAuthenticated ? (user?.orderCount ?? 0) : null}
+        memberSinceLabel={
+          isAuthenticated && user?.createdAt ? formatMemberSince(user.createdAt) : null
+        }
       />
 
       <HomeBridgingCta
@@ -354,7 +361,15 @@ export default function Home() {
               style={{ background: '#f0e6d0', overflow: 'hidden' }}
               {...cancelSuccessSheetMotion}
             >
-              <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+              <div
+                style={{
+                  position: 'relative',
+                  flex: 1,
+                  minHeight: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+              >
                 <div
                   role="presentation"
                   aria-hidden
@@ -369,7 +384,10 @@ export default function Home() {
                     touchAction: 'none',
                   }}
                 />
-                <OrderCancelledSuccess refundedAmountPence={cancelSuccess.refundedPence} onDone={closeCancelSuccess} />
+                <OrderCancelledSuccess
+                  refundedAmountPence={cancelSuccess.refundedPence}
+                  onDone={closeCancelSuccess}
+                />
               </div>
             </motion.div>
           </>

@@ -69,7 +69,9 @@ export default function CancellationModal({ open, onClose, authFetch, order, onC
               boxShadow: '0 16px 48px rgba(0,0,0,0.35)',
             }}
           >
-            <div style={{ padding: '22px 22px 18px', borderBottom: '1px solid rgba(26,46,26,0.08)' }}>
+            <div
+              style={{ padding: '22px 22px 18px', borderBottom: '1px solid rgba(26,46,26,0.08)' }}
+            >
               <h2
                 style={{
                   fontFamily: 'Fraunces, Georgia, serif',
@@ -91,7 +93,8 @@ export default function CancellationModal({ open, onClose, authFetch, order, onC
                   lineHeight: 1.45,
                 }}
               >
-                We will refund your card for the full order total. Refunds usually appear in 5–10 business days.
+                We will refund your card for the full order total. Refunds usually appear in 5–10
+                business days.
               </p>
             </div>
             <div style={{ padding: '16px 22px' }}>

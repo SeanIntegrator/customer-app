@@ -10,11 +10,8 @@ import { useOrderEvents } from '../context/OrderEventsContext';
 
 export default function PostOrderFeedbackLayer() {
   const navigate = useNavigate();
-  const {
-    postCheckoutFeedbackOrderId,
-    clearPostCheckoutFeedback,
-    applyKdsOrderCompleted,
-  } = useCart();
+  const { postCheckoutFeedbackOrderId, clearPostCheckoutFeedback, applyKdsOrderCompleted } =
+    useCart();
   const { authFetch } = useAuth();
   const { subscribe } = useOrderEvents();
 
@@ -64,7 +61,10 @@ export default function PostOrderFeedbackLayer() {
 
   const prevFeedbackId = useRef(null);
   useEffect(() => {
-    if (postCheckoutFeedbackOrderId != null && postCheckoutFeedbackOrderId !== prevFeedbackId.current) {
+    if (
+      postCheckoutFeedbackOrderId != null &&
+      postCheckoutFeedbackOrderId !== prevFeedbackId.current
+    ) {
       setGoogleOpen(false);
     }
     prevFeedbackId.current = postCheckoutFeedbackOrderId;

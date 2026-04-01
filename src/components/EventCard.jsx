@@ -1,7 +1,16 @@
 import { motion } from 'framer-motion';
 
 export default function EventCard({ event, onToggle }) {
-  const { title, date, time, description, spotsLeft, totalSpots, emoji, registered } = event;
+  const {
+    title,
+    date,
+    time,
+    description,
+    spotsLeft,
+    totalSpots: _totalSpots,
+    emoji,
+    registered,
+  } = event;
   const nearlyFull = spotsLeft != null && spotsLeft <= 3;
 
   return (
@@ -27,9 +36,11 @@ export default function EventCard({ event, onToggle }) {
 
       <div className="flex items-center justify-between">
         {spotsLeft != null ? (
-          <span className={`text-xs font-semibold font-sans px-2 py-1 rounded-full ${
-            nearlyFull ? 'bg-terracotta/15 text-terracotta' : 'bg-celadon text-moss'
-          }`}>
+          <span
+            className={`text-xs font-semibold font-sans px-2 py-1 rounded-full ${
+              nearlyFull ? 'bg-terracotta/15 text-terracotta' : 'bg-celadon text-moss'
+            }`}
+          >
             {spotsLeft === 0 ? 'Full' : `${spotsLeft} spots left`}
           </span>
         ) : (
@@ -41,9 +52,7 @@ export default function EventCard({ event, onToggle }) {
         <button
           onClick={() => onToggle?.(event.id)}
           className={`text-xs font-sans font-semibold px-3 py-1.5 rounded-full transition-all ${
-            registered
-              ? 'bg-sage text-bark'
-              : 'bg-bark text-cream hover:bg-clay'
+            registered ? 'bg-sage text-bark' : 'bg-bark text-cream hover:bg-clay'
           }`}
         >
           {registered ? '✓ Going' : 'Join'}

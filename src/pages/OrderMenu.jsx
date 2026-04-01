@@ -67,23 +67,28 @@ export default function OrderMenu() {
           >
             {cat.label}
             {countsBySlug[cat.slug] > 0 && (
-              <span style={{ marginLeft: 5, fontSize: 10, opacity: 0.6 }}>{countsBySlug[cat.slug]}</span>
+              <span style={{ marginLeft: 5, fontSize: 10, opacity: 0.6 }}>
+                {countsBySlug[cat.slug]}
+              </span>
             )}
           </button>
         ))}
       </div>
 
       <div className="scrollbar-hide" style={{ padding: '0 16px 96px' }}>
-        {loading && (
-          <MenuLoadingPanel />
-        )}
+        {loading && <MenuLoadingPanel />}
 
         {error && !loading && <MenuErrorPanel />}
 
-        {!loading && !error && slugSet.has(categorySlug) && filtered.length === 0 && <MenuEmptyPanel />}
+        {!loading && !error && slugSet.has(categorySlug) && filtered.length === 0 && (
+          <MenuEmptyPanel />
+        )}
 
         {!loading && !error && filtered.length > 0 && (
-          <motion.div layout style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 4 }}>
+          <motion.div
+            layout
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, paddingTop: 4 }}
+          >
             <AnimatePresence mode="popLayout">
               {filtered.map((item, i) => (
                 <motion.div

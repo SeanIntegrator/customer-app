@@ -1,6 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion';
 
-export default function Toast({ message, type = 'success', visible, bottomClassName = 'bottom-24' }) {
+export default function Toast({
+  message,
+  type = 'success',
+  visible,
+  bottomClassName = 'bottom-24',
+}) {
   return (
     <AnimatePresence>
       {visible && (
@@ -10,9 +15,7 @@ export default function Toast({ message, type = 'success', visible, bottomClassN
           exit={{ opacity: 0, y: 10, x: '-50%' }}
           transition={{ type: 'spring', stiffness: 400, damping: 28 }}
           className={`fixed left-1/2 z-[420] max-w-[min(340px,92vw)] px-4 py-2.5 rounded-2xl text-sm font-sans font-semibold shadow-warm-lg text-center leading-snug ${bottomClassName} ${
-            type === 'error'
-              ? 'bg-terracotta text-cream'
-              : 'bg-bark text-cream'
+            type === 'error' ? 'bg-terracotta text-cream' : 'bg-bark text-cream'
           }`}
         >
           {message}

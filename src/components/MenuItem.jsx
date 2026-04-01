@@ -40,9 +40,7 @@ export default function MenuItem({
         width: '100%',
         cursor: disabled ? 'not-allowed' : 'pointer',
         opacity: disabled ? 0.5 : 1,
-        boxShadow: hasAny
-          ? '0 4px 16px rgba(26,46,26,0.12)'
-          : '0 2px 12px rgba(26,46,26,0.07)',
+        boxShadow: hasAny ? '0 4px 16px rgba(26,46,26,0.12)' : '0 2px 12px rgba(26,46,26,0.07)',
         textAlign: 'left',
         padding: 0,
         position: 'relative',

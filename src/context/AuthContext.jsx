@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -117,16 +117,19 @@ export function AuthProvider({ children }) {
   }, []);
   const hasStoredToken = useCallback(() => Boolean(readStoredToken()), []);
 
-  const value = {
-    user,
-    loading,
-    isAuthenticated: !!user,
-    handleGoogleCredential,
-    logout,
-    authFetch,
-    hasStoredToken,
-    refreshSession: checkSession,
-  };
+  const value = useMemo(
+    () => ({
+      user,
+      loading,
+      isAuthenticated: !!user,
+      handleGoogleCredential,
+      logout,
+      authFetch,
+      hasStoredToken,
+      refreshSession: checkSession,
+    }),
+    [user, loading, handleGoogleCredential, logout, authFetch, hasStoredToken, checkSession]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

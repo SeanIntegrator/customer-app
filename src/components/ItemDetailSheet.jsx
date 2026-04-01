@@ -1,14 +1,19 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
-import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS, getSyrupChipColors } from '../data/mock';
+import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from '../data/modifierDefaults';
+import { getSyrupChipColors } from '../data/mock';
 import {
   CHECKOUT_PRIMARY_GRADIENT,
   CHECKOUT_PRIMARY_SHADOW,
   CHECKOUT_PRIMARY_TEXT,
 } from '../lib/checkoutTheme';
-
-const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
+import ItemDetailSheetHero from './item-detail/ItemDetailSheetHero';
+import {
+  itemDetailSectionLabel,
+  itemDetailActiveOption,
+  itemDetailInactiveOption,
+} from './item-detail/itemDetailSheetStyles';
 
 function isSoyaMilkName(name) {
   if (!name) return false;
@@ -49,6 +54,7 @@ export default function ItemDetailSheet({
   const lockedLineEdit = Boolean(isEdit && editCartLine?.fromExistingOrder);
   const formLocked = orderModifyLocked || lockedLineEdit;
 
+  // Intentionally depend on catalogObjectId + cartId, not full `item`, to avoid resetting on every parent render.
   useEffect(() => {
     if (!item) return;
     if (editCartLine) {
@@ -69,6 +75,7 @@ export default function ItemDetailSheet({
       setCustomerNote('');
       setSyrupAccordionOpen(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- stable item identity via catalogObjectId
   }, [item?.catalogObjectId, editCartLine?.cartId, milkOptionsVisible, editCartLine]);
 
   useEffect(() => {
@@ -80,14 +87,22 @@ export default function ItemDetailSheet({
   }, [milkOptionsVisible]);
 
   const toggleAlteration = (name) => {
-    setAlterations((prev) => prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]);
+    setAlterations((prev) =>
+      prev.includes(name) ? prev.filter((a) => a !== name) : [...prev, name]
+    );
   };
 
   const sizeDelta = sizeOptions.find((s) => s.name === size)?.delta ?? 0;
-  const milkDelta = milkOptionsVisible.find((m) => m.name === milk)?.delta ?? milkOptions.find((m) => m.name === milk)?.delta ?? 0;
+  const milkDelta =
+    milkOptionsVisible.find((m) => m.name === milk)?.delta ??
+    milkOptions.find((m) => m.name === milk)?.delta ??
+    0;
   const syrupDelta = syrup ? (syrupOptions.find((s) => s.name === syrup)?.delta ?? 0) : 0;
-  const alterationsDelta = alterations.reduce((sum, name) => sum + (alterationOptions.find((a) => a.name === name)?.delta ?? 0), 0);
-  const unitPrice = item ? (item.price + sizeDelta + milkDelta + syrupDelta + alterationsDelta) : 0;
+  const alterationsDelta = alterations.reduce(
+    (sum, name) => sum + (alterationOptions.find((a) => a.name === name)?.delta ?? 0),
+    0
+  );
+  const unitPrice = item ? item.price + sizeDelta + milkDelta + syrupDelta + alterationsDelta : 0;
   const totalPrice = unitPrice * quantity;
 
   const handleAdd = () => {
@@ -140,29 +155,6 @@ export default function ItemDetailSheet({
 
   const { sheetMotionProps, onGreenHeaderPointerDown } = useSheetSwipeToClose(onClose);
 
-  const sectionLabel = {
-    fontFamily: 'Plus Jakarta Sans, sans-serif',
-    fontSize: 9,
-    fontWeight: 700,
-    letterSpacing: '0.22em',
-    textTransform: 'uppercase',
-    color: 'rgba(26,46,26,0.45)',
-    marginBottom: 10,
-    display: 'block',
-  };
-
-  const activeOption = {
-    background: '#1a2e1a',
-    color: '#f0e6d0',
-    border: 'none',
-  };
-
-  const inactiveOption = {
-    background: 'rgba(240,230,208,0.6)',
-    border: '1.5px solid #d4c0a0',
-    color: '#6a5a48',
-  };
-
   return (
     <AnimatePresence>
       {item && (
@@ -198,57 +190,11 @@ export default function ItemDetailSheet({
             }}
             {...sheetMotionProps}
           >
-            {/* Dark green hero header */}
-            <div
-              onPointerDown={onGreenHeaderPointerDown}
-              style={{
-                background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
-                position: 'relative',
-                flexShrink: 0,
-                overflow: 'hidden',
-                touchAction: 'none',
-              }}
-            >
-              {/* Grain */}
-              <div style={{
-                position: 'absolute',
-                inset: 0,
-                backgroundImage: GRAIN,
-                backgroundRepeat: 'repeat',
-                pointerEvents: 'none',
-              }} />
-              {/* Drag handle */}
-              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 4, position: 'relative' }}>
-                <div style={{ width: 40, height: 4, background: 'rgba(240,230,208,0.3)', borderRadius: 100 }} />
-              </div>
-              {/* Hero content */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '16px 20px 22px', position: 'relative' }}>
-                <span style={{ fontSize: 56, lineHeight: 1 }}>{item.emoji}</span>
-                <div>
-                  <h2 style={{
-                    fontFamily: 'Fraunces, Georgia, serif',
-                    fontSize: 24,
-                    fontWeight: 800,
-                    color: '#f0e6d0',
-                    lineHeight: 1.15,
-                    letterSpacing: '-0.02em',
-                    margin: 0,
-                  }}>
-                    {item.name}
-                  </h2>
-                  <p style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 16,
-                    fontWeight: 600,
-                    color: '#c8902a',
-                    marginTop: 6,
-                    margin: '6px 0 0',
-                  }}>
-                    £{(unitPrice / 100).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <ItemDetailSheetHero
+              item={item}
+              unitPricePence={unitPrice}
+              onGreenHeaderPointerDown={onGreenHeaderPointerDown}
+            />
 
             {orderModifyLocked ? (
               <div
@@ -296,333 +242,374 @@ export default function ItemDetailSheet({
                   paddingBottom: 'calc(120px + env(safe-area-inset-bottom, 0px))',
                 }}
               >
-              {!orderModifyLocked && lockedLineEdit ? (
-                <p
+                {!orderModifyLocked && lockedLineEdit ? (
+                  <p
+                    style={{
+                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      color: 'rgba(26,46,26,0.65)',
+                      margin: '0 0 20px',
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    This item is already on your order and can&apos;t be changed here. Add new items
+                    from the menu, then save from your cart.
+                  </p>
+                ) : null}
+
+                <div
                   style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: 'rgba(26,46,26,0.65)',
-                    margin: '0 0 20px',
-                    lineHeight: 1.45,
+                    pointerEvents: formLocked ? 'none' : 'auto',
+                    opacity: formLocked ? 0.5 : 1,
                   }}
                 >
-                  This item is already on your order and can&apos;t be changed here. Add new items from the menu, then save from your cart.
-                </p>
-              ) : null}
+                  {/* Size picker */}
+                  {showDrinkUi && (
+                    <div style={{ marginBottom: 20 }}>
+                      <span style={itemDetailSectionLabel}>Size</span>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {sizeOptions.map((opt) => (
+                          <button
+                            key={opt.name}
+                            type="button"
+                            disabled={formLocked}
+                            onClick={() => setSize(opt.name)}
+                            style={{
+                              flex: 1,
+                              padding: '11px 8px',
+                              borderRadius: 14,
+                              fontFamily: 'Plus Jakarta Sans, sans-serif',
+                              fontSize: 13,
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              textAlign: 'center',
+                              ...(size === opt.name
+                                ? itemDetailActiveOption
+                                : itemDetailInactiveOption),
+                            }}
+                          >
+                            {opt.name}
+                            {opt.delta !== 0 && (
+                              <span
+                                style={{
+                                  display: 'block',
+                                  fontSize: 10,
+                                  fontWeight: 400,
+                                  marginTop: 2,
+                                  opacity: 0.7,
+                                }}
+                              >
+                                {opt.delta > 0
+                                  ? `+${(opt.delta / 100).toFixed(2)}`
+                                  : `-${(Math.abs(opt.delta) / 100).toFixed(2)}`}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              <div
-                style={{
-                  pointerEvents: formLocked ? 'none' : 'auto',
-                  opacity: formLocked ? 0.5 : 1,
-                }}
-              >
-              {/* Size picker */}
-              {showDrinkUi && (
-                <div style={{ marginBottom: 20 }}>
-                  <span style={sectionLabel}>Size</span>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    {sizeOptions.map((opt) => (
+                  {/* Milk picker */}
+                  {showDrinkUi && (
+                    <div style={{ marginBottom: 20 }}>
+                      <span style={itemDetailSectionLabel}>Milk</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {milkOptionsVisible.map((opt) => (
+                          <button
+                            key={opt.name}
+                            type="button"
+                            disabled={formLocked}
+                            onClick={() => setMilk(opt.name)}
+                            style={{
+                              padding: '9px 16px',
+                              borderRadius: 100,
+                              fontFamily: 'Plus Jakarta Sans, sans-serif',
+                              fontSize: 13,
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              ...(milk === opt.name
+                                ? itemDetailActiveOption
+                                : itemDetailInactiveOption),
+                            }}
+                          >
+                            {opt.name}
+                            {opt.delta > 0 && (
+                              <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>
+                                +{(opt.delta / 100).toFixed(2)}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Syrup picker (accordion; tap selected chip again to clear) */}
+                  {showDrinkUi && syrupOptions.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
                       <button
-                        key={opt.name}
                         type="button"
                         disabled={formLocked}
-                        onClick={() => setSize(opt.name)}
+                        onClick={() => setSyrupAccordionOpen((o) => !o)}
                         style={{
-                          flex: 1,
-                          padding: '11px 8px',
-                          borderRadius: 14,
-                          fontFamily: 'Plus Jakarta Sans, sans-serif',
-                          fontSize: 13,
-                          fontWeight: 600,
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 12,
+                          padding: '10px 4px',
+                          marginBottom: syrupAccordionOpen ? 10 : 0,
+                          background: 'transparent',
+                          border: 'none',
                           cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          textAlign: 'center',
-                          ...(size === opt.name ? activeOption : inactiveOption),
+                          textAlign: 'left',
                         }}
+                        aria-expanded={syrupAccordionOpen}
                       >
-                        {opt.name}
-                        {opt.delta !== 0 && (
-                          <span style={{ display: 'block', fontSize: 10, fontWeight: 400, marginTop: 2, opacity: 0.7 }}>
-                            {opt.delta > 0 ? `+${(opt.delta / 100).toFixed(2)}` : `-${(Math.abs(opt.delta) / 100).toFixed(2)}`}
+                        <span style={{ ...itemDetailSectionLabel, marginBottom: 0 }}>Syrup</span>
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: 'Plus Jakarta Sans, sans-serif',
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: 'rgba(26,46,26,0.55)',
+                              maxWidth: 160,
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
+                            {syrup ? syrup.replace(/\s*syrup\s*/i, '').trim() : 'None selected'}
                           </span>
-                        )}
+                          <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="rgba(26,46,26,0.45)"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{
+                              transform: syrupAccordionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease',
+                              flexShrink: 0,
+                            }}
+                            aria-hidden
+                          >
+                            <path d="M6 9l6 6 6-6" />
+                          </svg>
+                        </div>
                       </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Milk picker */}
-              {showDrinkUi && (
-                <div style={{ marginBottom: 20 }}>
-                  <span style={sectionLabel}>Milk</span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {milkOptionsVisible.map((opt) => (
-                      <button
-                        key={opt.name}
-                        type="button"
-                        disabled={formLocked}
-                        onClick={() => setMilk(opt.name)}
-                        style={{
-                          padding: '9px 16px',
-                          borderRadius: 100,
-                          fontFamily: 'Plus Jakarta Sans, sans-serif',
-                          fontSize: 13,
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          transition: 'all 0.15s ease',
-                          ...(milk === opt.name ? activeOption : inactiveOption),
-                        }}
-                      >
-                        {opt.name}
-                        {opt.delta > 0 && (
-                          <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
+                      <AnimatePresence initial={false}>
+                        {syrupAccordionOpen && (
+                          <motion.div
+                            key="syrup-panel"
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+                            style={{ overflow: 'hidden' }}
+                          >
+                            <div
+                              style={{
+                                display: 'flex',
+                                flexWrap: 'wrap',
+                                gap: 8,
+                                paddingBottom: 4,
+                              }}
+                            >
+                              {syrupOptions.map((opt) => {
+                                const colors = getSyrupChipColors(opt.name);
+                                const isActive = syrup === opt.name;
+                                return (
+                                  <button
+                                    key={opt.name}
+                                    type="button"
+                                    disabled={formLocked}
+                                    onClick={() =>
+                                      setSyrup((cur) => (cur === opt.name ? null : opt.name))
+                                    }
+                                    style={{
+                                      padding: '9px 16px',
+                                      borderRadius: 100,
+                                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                      fontSize: 13,
+                                      fontWeight: 500,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease',
+                                      border: isActive ? 'none' : '1.5px solid #d4c0a0',
+                                      background: isActive ? colors.bg : 'rgba(240,230,208,0.6)',
+                                      color: isActive ? colors.text : '#6a5a48',
+                                    }}
+                                  >
+                                    {opt.name.replace(/\s*syrup\s*/i, '').trim()}
+                                    {opt.delta > 0 && (
+                                      <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>
+                                        +{(opt.delta / 100).toFixed(2)}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </motion.div>
                         )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      </AnimatePresence>
+                    </div>
+                  )}
 
-              {/* Syrup picker (accordion; tap selected chip again to clear) */}
-              {showDrinkUi && syrupOptions.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <button
-                    type="button"
-                    disabled={formLocked}
-                    onClick={() => setSyrupAccordionOpen((o) => !o)}
+                  {/* Alterations */}
+                  {showDrinkUi && alterationOptions.length > 0 && (
+                    <div style={{ marginBottom: 20 }}>
+                      <span style={itemDetailSectionLabel}>Alterations</span>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                        {alterationOptions.map((opt) => {
+                          const isActive = alterations.includes(opt.name);
+                          return (
+                            <button
+                              key={opt.name}
+                              type="button"
+                              disabled={formLocked}
+                              onClick={() => toggleAlteration(opt.name)}
+                              style={{
+                                padding: '9px 16px',
+                                borderRadius: 100,
+                                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                fontSize: 13,
+                                fontWeight: 500,
+                                cursor: 'pointer',
+                                transition: 'all 0.15s ease',
+                                ...(isActive ? itemDetailActiveOption : itemDetailInactiveOption),
+                              }}
+                            >
+                              {opt.name}
+                              {opt.delta > 0 && (
+                                <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>
+                                  +{(opt.delta / 100).toFixed(2)}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Note for this item */}
+                  <div style={{ marginBottom: 20 }}>
+                    <span style={itemDetailSectionLabel}>Add a note</span>
+                    <textarea
+                      value={customerNote}
+                      readOnly={formLocked}
+                      onChange={(e) => setCustomerNote(e.target.value)}
+                      placeholder=""
+                      rows={2}
+                      className="focus:outline-none"
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '8px 14px',
+                        borderRadius: 14,
+                        border: '1.5px solid #e0d0b0',
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 13,
+                        resize: 'none',
+                        color: '#1a2e1a',
+                        background: 'rgba(255,255,255,0.5)',
+                      }}
+                    />
+                  </div>
+
+                  {/* Quantity */}
+                  <div
                     style={{
-                      width: '100%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      gap: 12,
-                      padding: '10px 4px',
-                      marginBottom: syrupAccordionOpen ? 10 : 0,
-                      background: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                      textAlign: 'left',
+                      marginBottom: 12,
                     }}
-                    aria-expanded={syrupAccordionOpen}
                   >
-                    <span style={{ ...sectionLabel, marginBottom: 0 }}>Syrup</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <span style={itemDetailSectionLabel}>Quantity</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <button
+                        type="button"
+                        disabled={formLocked}
+                        onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          background: 'rgba(26,46,26,0.08)',
+                          border: '1.5px solid #d4c0a0',
+                          color: '#1a2e1a',
+                          fontSize: 18,
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        −
+                      </button>
                       <span
                         style={{
-                          fontFamily: 'Plus Jakarta Sans, sans-serif',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: 'rgba(26,46,26,0.55)',
-                          maxWidth: 160,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
+                          fontFamily: 'Fraunces, Georgia, serif',
+                          fontSize: 20,
+                          fontWeight: 700,
+                          color: '#1a2e1a',
+                          width: 24,
+                          textAlign: 'center',
                         }}
                       >
-                        {syrup ? syrup.replace(/\s*syrup\s*/i, '').trim() : 'None selected'}
+                        {quantity}
                       </span>
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="rgba(26,46,26,0.45)"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                      <button
+                        type="button"
+                        disabled={formLocked}
+                        onClick={() => setQuantity((q) => q + 1)}
                         style={{
-                          transform: syrupAccordionOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                          transition: 'transform 0.2s ease',
-                          flexShrink: 0,
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          background: 'rgba(26,46,26,0.08)',
+                          border: '1.5px solid #d4c0a0',
+                          color: '#1a2e1a',
+                          fontSize: 18,
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          cursor: 'pointer',
                         }}
-                        aria-hidden
                       >
-                        <path d="M6 9l6 6 6-6" />
-                      </svg>
+                        +
+                      </button>
                     </div>
-                  </button>
-                  <AnimatePresence initial={false}>
-                    {syrupAccordionOpen && (
-                      <motion.div
-                        key="syrup-panel"
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-                        style={{ overflow: 'hidden' }}
-                      >
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingBottom: 4 }}>
-                          {syrupOptions.map((opt) => {
-                            const colors = getSyrupChipColors(opt.name);
-                            const isActive = syrup === opt.name;
-                            return (
-                              <button
-                                key={opt.name}
-                                type="button"
-                                disabled={formLocked}
-                                onClick={() => setSyrup((cur) => (cur === opt.name ? null : opt.name))}
-                                style={{
-                                  padding: '9px 16px',
-                                  borderRadius: 100,
-                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                                  fontSize: 13,
-                                  fontWeight: 500,
-                                  cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
-                                  border: isActive ? 'none' : '1.5px solid #d4c0a0',
-                                  background: isActive ? colors.bg : 'rgba(240,230,208,0.6)',
-                                  color: isActive ? colors.text : '#6a5a48',
-                                }}
-                              >
-                                {opt.name.replace(/\s*syrup\s*/i, '').trim()}
-                                {opt.delta > 0 && (
-                                  <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-
-              {/* Alterations */}
-              {showDrinkUi && alterationOptions.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <span style={sectionLabel}>Alterations</span>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {alterationOptions.map((opt) => {
-                      const isActive = alterations.includes(opt.name);
-                      return (
-                        <button
-                          key={opt.name}
-                          type="button"
-                          disabled={formLocked}
-                          onClick={() => toggleAlteration(opt.name)}
-                          style={{
-                            padding: '9px 16px',
-                            borderRadius: 100,
-                            fontFamily: 'Plus Jakarta Sans, sans-serif',
-                            fontSize: 13,
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                            ...(isActive ? activeOption : inactiveOption),
-                          }}
-                        >
-                          {opt.name}
-                          {opt.delta > 0 && (
-                            <span style={{ fontSize: 10, marginLeft: 4, opacity: 0.7 }}>+{(opt.delta / 100).toFixed(2)}</span>
-                          )}
-                        </button>
-                      );
-                    })}
                   </div>
+
+                  {addDisabled && !orderModifyLocked && (
+                    <p
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 13,
+                        color: 'rgba(26,46,26,0.55)',
+                        textAlign: 'center',
+                        marginBottom: 0,
+                      }}
+                    >
+                      One moment — loading your order…
+                    </p>
+                  )}
                 </div>
-              )}
-
-              {/* Note for this item */}
-              <div style={{ marginBottom: 20 }}>
-                <span style={sectionLabel}>Add a note</span>
-                <textarea
-                  value={customerNote}
-                  readOnly={formLocked}
-                  onChange={(e) => setCustomerNote(e.target.value)}
-                  placeholder=""
-                  rows={2}
-                  className="focus:outline-none"
-                  style={{
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    padding: '8px 14px',
-                    borderRadius: 14,
-                    border: '1.5px solid #e0d0b0',
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 13,
-                    resize: 'none',
-                    color: '#1a2e1a',
-                    background: 'rgba(255,255,255,0.5)',
-                  }}
-                />
-              </div>
-
-              {/* Quantity */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <span style={sectionLabel}>Quantity</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <button
-                    type="button"
-                    disabled={formLocked}
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: 'rgba(26,46,26,0.08)',
-                      border: '1.5px solid #d4c0a0',
-                      color: '#1a2e1a',
-                      fontSize: 18,
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    −
-                  </button>
-                  <span style={{
-                    fontFamily: 'Fraunces, Georgia, serif',
-                    fontSize: 20,
-                    fontWeight: 700,
-                    color: '#1a2e1a',
-                    width: 24,
-                    textAlign: 'center',
-                  }}>
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={formLocked}
-                    onClick={() => setQuantity((q) => q + 1)}
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: '50%',
-                      background: 'rgba(26,46,26,0.08)',
-                      border: '1.5px solid #d4c0a0',
-                      color: '#1a2e1a',
-                      fontSize: 18,
-                      fontWeight: 600,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-
-              {addDisabled && !orderModifyLocked && (
-                <p
-                  style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 13,
-                    color: 'rgba(26,46,26,0.55)',
-                    textAlign: 'center',
-                    marginBottom: 0,
-                  }}
-                >
-                  One moment — loading your order…
-                </p>
-              )}
-              </div>
               </div>
 
               <div
@@ -664,15 +651,26 @@ export default function ItemDetailSheet({
                     padding: '18px 24px',
                     border: 'none',
                     cursor:
-                      !lockedLineEdit && (addDisabled || orderModifyLocked) ? 'not-allowed' : 'pointer',
+                      !lockedLineEdit && (addDisabled || orderModifyLocked)
+                        ? 'not-allowed'
+                        : 'pointer',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     boxShadow:
-                      !lockedLineEdit && (addDisabled || orderModifyLocked) ? 'none' : CHECKOUT_PRIMARY_SHADOW,
+                      !lockedLineEdit && (addDisabled || orderModifyLocked)
+                        ? 'none'
+                        : CHECKOUT_PRIMARY_SHADOW,
                   }}
                 >
-                  <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 800, letterSpacing: '-0.02em' }}>
+                  <span
+                    style={{
+                      fontFamily: 'Fraunces, Georgia, serif',
+                      fontSize: 20,
+                      fontWeight: 800,
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
                     {lockedLineEdit
                       ? 'Close'
                       : addDisabled
@@ -684,7 +682,13 @@ export default function ItemDetailSheet({
                             : 'Add to order'}
                   </span>
                   {!lockedLineEdit ? (
-                    <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 15, fontWeight: 700 }}>
+                    <span
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 15,
+                        fontWeight: 700,
+                      }}
+                    >
                       £{(totalPrice / 100).toFixed(2)}
                     </span>
                   ) : null}

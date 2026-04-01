@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchModifierCategories } from '../lib/api';
 import { getEnrichedCatalog } from '../lib/catalogEnrich';
-import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from '../data/mock';
+import { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from '../data/modifierDefaults';
 
 function parseMilkOptions(categories) {
   const milkCat = categories.find((c) => c.name?.toLowerCase().includes('milk'));
@@ -12,7 +12,7 @@ function parseMilkOptions(categories) {
 function parseSyrupOptions(categories) {
   const syrups = [];
   for (const cat of categories) {
-    for (const m of (cat.modifiers || [])) {
+    for (const m of cat.modifiers || []) {
       if (m.name?.toLowerCase().includes('syrup')) {
         syrups.push({ name: m.name.trim(), delta: m.price ?? 0 });
       }
@@ -25,7 +25,7 @@ function parseAlterationOptions(categories) {
   const ALTERATION_KEYWORDS = ['extra shot', 'decaf'];
   const alterations = [];
   for (const cat of categories) {
-    for (const m of (cat.modifiers || [])) {
+    for (const m of cat.modifiers || []) {
       const nameLower = m.name?.toLowerCase().trim() ?? '';
       if (ALTERATION_KEYWORDS.some((kw) => nameLower.includes(kw))) {
         alterations.push({ name: m.name.trim(), delta: m.price ?? 0 });

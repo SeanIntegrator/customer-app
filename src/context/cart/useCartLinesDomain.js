@@ -28,7 +28,11 @@ export function useCartLinesDomain() {
       }
       return [
         ...prev,
-        { ...item, quantity: item.quantity ?? 1, fromExistingOrder: item.fromExistingOrder ?? false },
+        {
+          ...item,
+          quantity: item.quantity ?? 1,
+          fromExistingOrder: item.fromExistingOrder ?? false,
+        },
       ];
     });
   }, []);
@@ -50,7 +54,9 @@ export function useCartLinesDomain() {
   }, []);
 
   const updateCartLine = useCallback((cartId, updates) => {
-    setItems((prev) => prev.map((i) => (i.cartId === cartId && !i.fromExistingOrder ? { ...i, ...updates } : i)));
+    setItems((prev) =>
+      prev.map((i) => (i.cartId === cartId && !i.fromExistingOrder ? { ...i, ...updates } : i))
+    );
   }, []);
 
   const clearCart = useCallback(() => {
@@ -62,19 +68,33 @@ export function useCartLinesDomain() {
   const totalItems = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);
   const subtotal = useMemo(() => items.reduce((s, i) => s + i.totalPrice * i.quantity, 0), [items]);
 
-  return {
-    items,
-    setItems,
-    orderAllergens,
-    setOrderAllergens,
-    applyReward,
-    setApplyReward,
-    addItem,
-    removeItem,
-    updateQuantity,
-    updateCartLine,
-    clearCart,
-    totalItems,
-    subtotal,
-  };
+  return useMemo(
+    () => ({
+      items,
+      setItems,
+      orderAllergens,
+      setOrderAllergens,
+      applyReward,
+      setApplyReward,
+      addItem,
+      removeItem,
+      updateQuantity,
+      updateCartLine,
+      clearCart,
+      totalItems,
+      subtotal,
+    }),
+    [
+      items,
+      orderAllergens,
+      applyReward,
+      totalItems,
+      subtotal,
+      addItem,
+      removeItem,
+      updateQuantity,
+      updateCartLine,
+      clearCart,
+    ]
+  );
 }

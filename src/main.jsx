@@ -7,6 +7,7 @@ import { AppConfigProvider } from './context/AppConfigContext';
 import { LoyaltyProvider } from './context/LoyaltyContext';
 import { CartProvider } from './context/CartContext';
 import { OrderEventsProvider } from './context/OrderEventsContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
 import Home from './pages/Home';
 import OrderShell from './pages/OrderShell';
@@ -65,6 +66,8 @@ function Root() {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <Root />
+    <ErrorBoundary>
+      <Root />
+    </ErrorBoundary>
   </React.StrictMode>
 );

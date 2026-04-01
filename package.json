@@ -7,8 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "eslint src scripts --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{js,jsx}\" \"scripts/**/*.mjs\" \"*.{json,css}\" \"eslint.config.js\" \"vitest.config.js\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"scripts/**/*.mjs\" \"*.{json,css}\" \"eslint.config.js\" \"vitest.config.js\"",
     "check:guardrails": "node scripts/quality-guardrails.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "ci": "npm run lint && npm run format:check && npm run check:guardrails && npm test && npm run build"
   },
   "dependencies": {
     "@react-oauth/google": "^0.13.4",
@@ -20,9 +24,19 @@
     "socket.io-client": "^4.8.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.20",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "globals": "^17.4.0",
+    "jsdom": "^29.0.1",
     "postcss": "^8.4.45",
+    "prettier": "^3.8.1",
     "tailwindcss": "^3.4.10",
     "vite": "^5.4.0",
     "vitest": "^3.0.5"

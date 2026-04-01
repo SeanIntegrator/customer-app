@@ -71,7 +71,7 @@ export default function OrderPaymentSuccess() {
             finalizeAttempts += 1;
             try {
               await finalizeCheckoutSession(authFetch, sessionId);
-            } catch (_) {
+            } catch {
               /* keep polling; webhook/finalizer may still complete shortly */
             }
           }
@@ -90,7 +90,16 @@ export default function OrderPaymentSuccess() {
     return () => {
       cancelled = true;
     };
-  }, [sessionId, incremental, isAuthenticated, authLoading, authFetch, clearCart, clearAddingToOrder, setActiveOrder]);
+  }, [
+    sessionId,
+    incremental,
+    isAuthenticated,
+    authLoading,
+    authFetch,
+    clearCart,
+    clearAddingToOrder,
+    setActiveOrder,
+  ]);
 
   useEffect(() => {
     if (phase === 'ready' && order?.id) {
@@ -142,7 +151,11 @@ export default function OrderPaymentSuccess() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] px-6 text-center gap-4">
         <p className="font-serif text-lg text-[#1a2e1a]">Sign in to see your order status.</p>
         <SignInButton />
-        <button type="button" onClick={() => navigate('/order')} className="text-sm text-[#1a2e1a]/60 underline">
+        <button
+          type="button"
+          onClick={() => navigate('/order')}
+          className="text-sm text-[#1a2e1a]/60 underline"
+        >
           Back to menu
         </button>
       </div>
@@ -164,7 +177,8 @@ export default function OrderPaymentSuccess() {
       <div className="flex flex-col items-center justify-center min-h-[50vh] px-6 text-center gap-4">
         <p className="font-serif text-lg text-[#1a2e1a]">Something went wrong</p>
         <p className="text-sm text-[#1a2e1a]/55 max-w-sm">
-          We could not confirm your order yet. If you were charged, check your order history in your profile.
+          We could not confirm your order yet. If you were charged, check your order history in your
+          profile.
         </p>
         <button
           type="button"
@@ -178,7 +192,11 @@ export default function OrderPaymentSuccess() {
         >
           Order history
         </button>
-        <button type="button" onClick={() => navigate('/order')} className="text-sm text-[#1a2e1a]/60 underline">
+        <button
+          type="button"
+          onClick={() => navigate('/order')}
+          className="text-sm text-[#1a2e1a]/60 underline"
+        >
           Back to menu
         </button>
       </div>
@@ -191,7 +209,9 @@ export default function OrderPaymentSuccess() {
         variant="placed"
         pickupMinutes={pickupMinutesFromOrderForSuccess(order)}
         onDone={handleDone}
-        stampPreviewTotalPence={order?.total_amount != null ? Number(order.total_amount) : undefined}
+        stampPreviewTotalPence={
+          order?.total_amount != null ? Number(order.total_amount) : undefined
+        }
       />
     </div>
   );

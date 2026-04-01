@@ -4,13 +4,19 @@ import { DEFAULT_REWARD_DRINK_CATEGORY_SLUGS } from './menuBuckets';
 
 describe('loyaltyDiscount', () => {
   it('returns 0 for empty cart', () => {
-    expect(computeRewardDiscountPenceForCart([], REWARD_MAX_PENCE, DEFAULT_REWARD_DRINK_CATEGORY_SLUGS)).toBe(0);
+    expect(
+      computeRewardDiscountPenceForCart([], REWARD_MAX_PENCE, DEFAULT_REWARD_DRINK_CATEGORY_SLUGS)
+    ).toBe(0);
   });
 
   it('caps discount at reward max', () => {
     const items = [{ category: 'hot-drinks', totalPrice: 2000, quantity: 1 }];
-    expect(computeRewardDiscountPenceForCart(items, REWARD_MAX_PENCE, DEFAULT_REWARD_DRINK_CATEGORY_SLUGS)).toBe(
-      REWARD_MAX_PENCE
-    );
+    expect(
+      computeRewardDiscountPenceForCart(
+        items,
+        REWARD_MAX_PENCE,
+        DEFAULT_REWARD_DRINK_CATEGORY_SLUGS
+      )
+    ).toBe(REWARD_MAX_PENCE);
   });
 });

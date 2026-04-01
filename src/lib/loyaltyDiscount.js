@@ -9,7 +9,11 @@ export function cartHasEligibleDrinkForReward(items, drinkCategorySlugs) {
 }
 
 /** Cheapest drink line total in basket; discount preview = min(line, cap). */
-export function computeRewardDiscountPenceForCart(items, rewardMaxPence = REWARD_MAX_PENCE, drinkCategorySlugs) {
+export function computeRewardDiscountPenceForCart(
+  items,
+  rewardMaxPence = REWARD_MAX_PENCE,
+  drinkCategorySlugs
+) {
   if (!Array.isArray(items)) return 0;
   let minLine = null;
   for (const i of items) {

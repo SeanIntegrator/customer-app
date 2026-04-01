@@ -28,8 +28,18 @@ export default function CartDrawerHeader({ title, onClose, onGreenHeaderPointerD
           pointerEvents: 'none',
         }}
       />
-      <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 2, position: 'relative' }}>
-        <div style={{ width: 40, height: 4, background: 'rgba(240,230,208,0.3)', borderRadius: 100 }} />
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          paddingTop: 12,
+          paddingBottom: 2,
+          position: 'relative',
+        }}
+      >
+        <div
+          style={{ width: 40, height: 4, background: 'rgba(240,230,208,0.3)', borderRadius: 100 }}
+        />
       </div>
       <div
         style={{

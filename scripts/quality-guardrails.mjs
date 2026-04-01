@@ -38,7 +38,10 @@ for (const abs of walk(SRC)) {
     violations.push(`${rel}: ${lines.length} lines exceeds max ${MAX_LINES}`);
   }
 
-  if (content.includes("sessionStorage.getItem('auth_token')") && !ALLOWED_TOKEN_LITERAL_FILES.has(rel)) {
+  if (
+    content.includes("sessionStorage.getItem('auth_token')") &&
+    !ALLOWED_TOKEN_LITERAL_FILES.has(rel)
+  ) {
     violations.push(`${rel}: direct auth_token sessionStorage access is not allowed`);
   }
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 export function useOrderLifecycleDomain() {
   const [activeOrder, setActiveOrder] = useState(null);
@@ -10,17 +10,28 @@ export function useOrderLifecycleDomain() {
   const clearEditMode = useCallback(() => setEditOrderId(null), []);
   const clearAddingToOrder = useCallback(() => setAddingToOrderId(null), []);
 
-  return {
-    activeOrder,
-    setActiveOrder,
-    clearActiveOrder,
-    editOrderId,
-    setEditOrderId,
-    clearEditMode,
-    addingToOrderId,
-    setAddingToOrderId,
-    clearAddingToOrder,
-    suppressNavBasketForPaidGoldCard,
-    setSuppressNavBasketForPaidGoldCard,
-  };
+  return useMemo(
+    () => ({
+      activeOrder,
+      setActiveOrder,
+      clearActiveOrder,
+      editOrderId,
+      setEditOrderId,
+      clearEditMode,
+      addingToOrderId,
+      setAddingToOrderId,
+      clearAddingToOrder,
+      suppressNavBasketForPaidGoldCard,
+      setSuppressNavBasketForPaidGoldCard,
+    }),
+    [
+      activeOrder,
+      editOrderId,
+      addingToOrderId,
+      suppressNavBasketForPaidGoldCard,
+      clearActiveOrder,
+      clearEditMode,
+      clearAddingToOrder,
+    ]
+  );
 }

@@ -30,20 +30,62 @@ export default function HomeBridgingCta({
               boxShadow: '0 10px 40px rgba(180,120,18,0.22), 0 2px 8px rgba(0,0,0,0.08)',
             }}
           >
-            <div style={{ background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', padding: '16px 22px 18px' }}>
-              <div style={{ width: '55%', height: 10, borderRadius: 100, background: 'rgba(18,32,18,0.12)', marginBottom: 14 }} />
-              <div style={{ width: '72%', height: 22, borderRadius: 8, background: 'rgba(18,32,18,0.14)' }} />
+            <div
+              style={{
+                background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                padding: '16px 22px 18px',
+              }}
+            >
+              <div
+                style={{
+                  width: '55%',
+                  height: 10,
+                  borderRadius: 100,
+                  background: 'rgba(18,32,18,0.12)',
+                  marginBottom: 14,
+                }}
+              />
+              <div
+                style={{
+                  width: '72%',
+                  height: 22,
+                  borderRadius: 8,
+                  background: 'rgba(18,32,18,0.14)',
+                }}
+              />
             </div>
             <div style={{ background: '#faf5eb', padding: '18px 22px 22px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
                 {[1, 2].map((k) => (
                   <div key={k} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(26,46,26,0.08)' }} />
-                    <div style={{ flex: 1, height: 14, borderRadius: 6, background: 'rgba(26,46,26,0.07)' }} />
+                    <div
+                      style={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: 8,
+                        background: 'rgba(26,46,26,0.08)',
+                      }}
+                    />
+                    <div
+                      style={{
+                        flex: 1,
+                        height: 14,
+                        borderRadius: 6,
+                        background: 'rgba(26,46,26,0.07)',
+                      }}
+                    />
                   </div>
                 ))}
               </div>
-              <div style={{ height: 12, width: '40%', borderRadius: 6, background: 'rgba(26,46,26,0.06)', marginLeft: 'auto' }} />
+              <div
+                style={{
+                  height: 12,
+                  width: '40%',
+                  borderRadius: 6,
+                  background: 'rgba(26,46,26,0.06)',
+                  marginLeft: 'auto',
+                }}
+              />
             </div>
           </motion.div>
         ) : goldCardModel ? (
@@ -71,21 +113,69 @@ export default function HomeBridgingCta({
               boxShadow: '0 10px 40px rgba(180,120,18,0.38), 0 2px 8px rgba(0,0,0,0.12)',
             }}
           >
-            <div style={{ background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', padding: '16px 22px 18px' }}>
-              <div style={{ width: '100%', height: 3, background: 'rgba(18,32,18,0.15)', borderRadius: 100, overflow: 'hidden', marginBottom: 14 }}>
+            <div
+              style={{
+                background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+                padding: '16px 22px 18px',
+              }}
+            >
+              <div
+                style={{
+                  width: '100%',
+                  height: 3,
+                  background: 'rgba(18,32,18,0.15)',
+                  borderRadius: 100,
+                  overflow: 'hidden',
+                  marginBottom: 14,
+                }}
+              >
                 <motion.div
-                  style={{ height: '100%', width: '38%', background: 'rgba(18,32,18,0.45)', borderRadius: 100 }}
+                  style={{
+                    height: '100%',
+                    width: '38%',
+                    background: 'rgba(18,32,18,0.45)',
+                    borderRadius: 100,
+                  }}
                   animate={{ x: ['-100%', '290%'] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
                 />
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
-                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 26, fontWeight: 800, color: '#122012', letterSpacing: '-0.025em', lineHeight: 1.05 }}>Order being prepared.</p>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'Fraunces, Georgia, serif',
+                    fontSize: 26,
+                    fontWeight: 800,
+                    color: '#122012',
+                    letterSpacing: '-0.025em',
+                    lineHeight: 1.05,
+                  }}
+                >
+                  Order being prepared.
+                </p>
                 <motion.span
                   animate={{ opacity: [1, 0.45, 1] }}
                   transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-                  style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, color: '#122012', background: 'rgba(18,32,18,0.16)', borderRadius: 100, padding: '5px 11px', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 4 }}
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#122012',
+                    background: 'rgba(18,32,18,0.16)',
+                    borderRadius: 100,
+                    padding: '5px 11px',
+                    whiteSpace: 'nowrap',
+                    flexShrink: 0,
+                    marginTop: 4,
+                  }}
                 >
                   {goldCardPickupChipLabel(goldCardModel.pickupMinutes)}
                 </motion.span>
@@ -95,19 +185,52 @@ export default function HomeBridgingCta({
             <div style={{ background: '#faf5eb', padding: '14px 22px 18px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 9, marginBottom: 14 }}>
                 {goldCardModel.items.map((item, i) => {
-                  const mods = [item.size !== 'Regular' && item.size, !DEFAULT_MILKS.includes(item.milk) && item.milk].filter(Boolean).join(', ');
+                  const mods = [
+                    item.size !== 'Regular' && item.size,
+                    !DEFAULT_MILKS.includes(item.milk) && item.milk,
+                  ]
+                    .filter(Boolean)
+                    .join(', ');
                   return (
                     <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                      <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>{item.emoji}</span>
+                      <span style={{ fontSize: 17, lineHeight: 1, flexShrink: 0 }}>
+                        {item.emoji}
+                      </span>
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, fontWeight: 600, color: '#1a2e1a' }}>
+                        <span
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#1a2e1a',
+                          }}
+                        >
                           {item.quantity > 1 ? `${item.quantity}× ` : ''}
                           {item.name}
                         </span>
-                        {mods && <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', display: 'block' }}>{mods}</span>}
+                        {mods && (
+                          <span
+                            style={{
+                              fontFamily: 'Plus Jakarta Sans, sans-serif',
+                              fontSize: 12,
+                              color: 'rgba(26,46,26,0.45)',
+                              display: 'block',
+                            }}
+                          >
+                            {mods}
+                          </span>
+                        )}
                       </div>
                       {item.totalPrice != null && Number.isFinite(Number(item.totalPrice)) && (
-                        <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, fontWeight: 600, color: '#1a2e1a', flexShrink: 0 }}>
+                        <span
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: '#1a2e1a',
+                            flexShrink: 0,
+                          }}
+                        >
                           £{((Number(item.totalPrice) * item.quantity) / 100).toFixed(2)}
                         </span>
                       )}
@@ -116,13 +239,40 @@ export default function HomeBridgingCta({
                 })}
               </div>
 
-              <div style={{ borderTop: '1.5px solid rgba(26,46,26,0.1)', paddingTop: 12, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>Total</span>
-                <span style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 22, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>
-                  £{(
-                    Number.isFinite(Number(goldCardModel.total_amount))
-                      ? Number(goldCardModel.total_amount) / 100
-                      : 0
+              <div
+                style={{
+                  borderTop: '1.5px solid rgba(26,46,26,0.1)',
+                  paddingTop: 12,
+                  display: 'flex',
+                  alignItems: 'baseline',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(26,46,26,0.4)',
+                  }}
+                >
+                  Total
+                </span>
+                <span
+                  style={{
+                    fontFamily: 'Fraunces, Georgia, serif',
+                    fontSize: 22,
+                    fontWeight: 900,
+                    color: '#1a2e1a',
+                    letterSpacing: '-0.03em',
+                  }}
+                >
+                  £
+                  {(Number.isFinite(Number(goldCardModel.total_amount))
+                    ? Number(goldCardModel.total_amount) / 100
+                    : 0
                   ).toFixed(2)}
                 </span>
               </div>
@@ -178,7 +328,16 @@ export default function HomeBridgingCta({
                 </div>
               ) : null}
 
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: 'rgba(26,46,26,0.35)', textAlign: 'right', marginTop: 8 }}>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'rgba(26,46,26,0.35)',
+                  textAlign: 'right',
+                  marginTop: 8,
+                }}
+              >
                 {goldCardModel.editable ? 'Tap to edit order ›' : 'View details ›'}
               </p>
             </div>
@@ -207,7 +366,17 @@ export default function HomeBridgingCta({
             }}
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/order')}
-            style={{ width: '100%', background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)', borderRadius: 24, padding: '22px 26px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 'none', cursor: 'pointer' }}
+            style={{
+              width: '100%',
+              background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
+              borderRadius: 24,
+              padding: '22px 26px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              border: 'none',
+              cursor: 'pointer',
+            }}
           >
             <div>
               <p

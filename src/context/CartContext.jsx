@@ -1,4 +1,4 @@
-import { createContext, useContext, useCallback } from 'react';
+import { createContext, useContext, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getEnrichedCatalog } from '../lib/catalogEnrich';
 import { useCartLinesDomain } from './cart/useCartLinesDomain';
@@ -41,6 +41,7 @@ export function CartProvider({ children }) {
     subtotal,
     orderAllergens,
     setOrderAllergens,
+    setItems,
     applyReward,
     setApplyReward,
   } = cartLines;
@@ -51,6 +52,8 @@ export function CartProvider({ children }) {
     editOrderId,
     setEditOrderId,
     addingToOrderId,
+    setAddingToOrderId,
+    clearAddingToOrder,
     suppressNavBasketForPaidGoldCard,
     setSuppressNavBasketForPaidGoldCard,
   } = orderLifecycle;
@@ -63,112 +66,148 @@ export function CartProvider({ children }) {
   } = feedback;
 
   /** Pre-fill cart from API order shape; opening menu to add more items before PATCH checkout. */
-  const loadCartFromOrderEdit = useCallback(async (apiOrder) => {
-    if (!apiOrder?.id) return;
-    orderLifecycle.setAddingToOrderId(null);
-    cartLines.setApplyReward(false);
-    orderLifecycle.setEditOrderId(apiOrder.id);
-    cartLines.setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
+  const loadCartFromOrderEdit = useCallback(
+    async (apiOrder) => {
+      if (!apiOrder?.id) return;
+      setAddingToOrderId(null);
+      setApplyReward(false);
+      setEditOrderId(apiOrder.id);
+      setOrderAllergens(normalizeAllergensFromApi(apiOrder.allergens));
 
-    let variationById = {};
-    try {
-      const enriched = await getEnrichedCatalog();
-      variationById = enriched.variationById ?? {};
-    } catch (_) {
-      /* menu lookup optional */
-    }
+      let variationById = {};
+      try {
+        const enriched = await getEnrichedCatalog();
+        variationById = enriched.variationById ?? {};
+      } catch {
+        /* menu lookup optional */
+      }
 
-    cartLines.setItems(
-      (apiOrder.items || []).map((it, idx) => {
-        const vid = it.square_variation_id;
-        const meta = vid && variationById[vid] ? variationById[vid] : null;
-        const showDrinkModifiers = meta ? meta.showDrinkModifiers : true;
-        const category = meta?.categorySlug ?? 'other';
-        return {
-          cartId: `edit-${it.id}-${idx}`,
-          catalogObjectId: vid,
-          name: it.item_name,
-          emoji: it.item_emoji || '☕',
-          category,
-          showDrinkModifiers,
-          size: 'Regular',
-          milk: 'Full Fat',
-          syrup: null,
-          alterations: apiModifiersToAlterationNames(it.modifiers),
-          quantity: it.quantity,
-          totalPrice: it.unit_price,
-          fromExistingOrder: true,
-          customerNote: it.customer_note != null ? String(it.customer_note) : '',
-        };
-      })
-    );
-  }, [cartLines, orderLifecycle]);
+      setItems(
+        (apiOrder.items || []).map((it, idx) => {
+          const vid = it.square_variation_id;
+          const meta = vid && variationById[vid] ? variationById[vid] : null;
+          const showDrinkModifiers = meta ? meta.showDrinkModifiers : true;
+          const category = meta?.categorySlug ?? 'other';
+          return {
+            cartId: `edit-${it.id}-${idx}`,
+            catalogObjectId: vid,
+            name: it.item_name,
+            emoji: it.item_emoji || '☕',
+            category,
+            showDrinkModifiers,
+            size: 'Regular',
+            milk: 'Full Fat',
+            syrup: null,
+            alterations: apiModifiersToAlterationNames(it.modifiers),
+            quantity: it.quantity,
+            totalPrice: it.unit_price,
+            fromExistingOrder: true,
+            customerNote: it.customer_note != null ? String(it.customer_note) : '',
+          };
+        })
+      );
+    },
+    [setAddingToOrderId, setApplyReward, setEditOrderId, setOrderAllergens, setItems]
+  );
 
   const clearEditMode = useCallback(() => {
-    orderLifecycle.setEditOrderId(null);
-    cartLines.setOrderAllergens([]);
-  }, [cartLines, orderLifecycle]);
+    setEditOrderId(null);
+    setOrderAllergens([]);
+  }, [setEditOrderId, setOrderAllergens]);
 
   const startAddingToOrder = useCallback(
     (orderId) => {
       if (orderId == null) return;
-      orderLifecycle.setEditOrderId(null);
-      cartLines.setApplyReward(false);
-      orderLifecycle.setAddingToOrderId(Number(orderId));
-      cartLines.setItems([]);
-      cartLines.setOrderAllergens([]);
+      setEditOrderId(null);
+      setApplyReward(false);
+      setAddingToOrderId(Number(orderId));
+      setItems([]);
+      setOrderAllergens([]);
       navigate('/order');
     },
-    [cartLines, navigate, orderLifecycle]
+    [setEditOrderId, setApplyReward, setAddingToOrderId, setItems, setOrderAllergens, navigate]
   );
 
   /** Replace cart with lines (e.g. usual order); clears edit mode. */
-  const replaceCartLines = useCallback((lines, opts = {}) => {
-    orderLifecycle.setEditOrderId(null);
-    orderLifecycle.setAddingToOrderId(null);
-    cartLines.setApplyReward(false);
-    cartLines.setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
-    cartLines.setItems(Array.isArray(lines) ? lines : []);
-  }, [cartLines, orderLifecycle]);
-
-  return (
-    <CartContext.Provider
-      value={{
-        items,
-        addItem,
-        removeItem,
-        updateQuantity,
-        updateCartLine,
-        clearCart,
-        totalItems,
-        subtotal,
-        orderAllergens,
-        setOrderAllergens,
-        activeOrder,
-        setActiveOrder,
-        clearActiveOrder,
-        editOrderId,
-        setEditOrderId,
-        loadCartFromOrderEdit,
-        clearEditMode,
-        addingToOrderId,
-        startAddingToOrder,
-        clearAddingToOrder: orderLifecycle.clearAddingToOrder,
-        replaceCartLines,
-        postCheckoutFeedbackOrderId,
-        beginPostCheckoutFeedback,
-        clearPostCheckoutFeedback,
-        registerPendingKdsFeedback,
-        applyKdsOrderCompleted,
-        suppressNavBasketForPaidGoldCard,
-        setSuppressNavBasketForPaidGoldCard,
-        applyReward,
-        setApplyReward,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
+  const replaceCartLines = useCallback(
+    (lines, opts = {}) => {
+      setEditOrderId(null);
+      setAddingToOrderId(null);
+      setApplyReward(false);
+      setOrderAllergens(Array.isArray(opts.allergens) ? opts.allergens : []);
+      setItems(Array.isArray(lines) ? lines : []);
+    },
+    [setEditOrderId, setAddingToOrderId, setApplyReward, setOrderAllergens, setItems]
   );
+
+  const value = useMemo(
+    () => ({
+      items,
+      addItem,
+      removeItem,
+      updateQuantity,
+      updateCartLine,
+      clearCart,
+      totalItems,
+      subtotal,
+      orderAllergens,
+      setOrderAllergens,
+      activeOrder,
+      setActiveOrder,
+      clearActiveOrder,
+      editOrderId,
+      setEditOrderId,
+      loadCartFromOrderEdit,
+      clearEditMode,
+      addingToOrderId,
+      startAddingToOrder,
+      clearAddingToOrder,
+      replaceCartLines,
+      postCheckoutFeedbackOrderId,
+      beginPostCheckoutFeedback,
+      clearPostCheckoutFeedback,
+      registerPendingKdsFeedback,
+      applyKdsOrderCompleted,
+      suppressNavBasketForPaidGoldCard,
+      setSuppressNavBasketForPaidGoldCard,
+      applyReward,
+      setApplyReward,
+    }),
+    [
+      items,
+      addItem,
+      removeItem,
+      updateQuantity,
+      updateCartLine,
+      clearCart,
+      totalItems,
+      subtotal,
+      orderAllergens,
+      setOrderAllergens,
+      activeOrder,
+      setActiveOrder,
+      clearActiveOrder,
+      editOrderId,
+      setEditOrderId,
+      loadCartFromOrderEdit,
+      clearEditMode,
+      addingToOrderId,
+      startAddingToOrder,
+      clearAddingToOrder,
+      replaceCartLines,
+      postCheckoutFeedbackOrderId,
+      beginPostCheckoutFeedback,
+      clearPostCheckoutFeedback,
+      registerPendingKdsFeedback,
+      applyKdsOrderCompleted,
+      suppressNavBasketForPaidGoldCard,
+      setSuppressNavBasketForPaidGoldCard,
+      applyReward,
+      setApplyReward,
+    ]
+  );
+
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
 export function useCart() {

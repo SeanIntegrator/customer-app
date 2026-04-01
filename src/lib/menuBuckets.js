@@ -40,6 +40,9 @@ export function menuBucketSlugForSquareCategory(squareCategoryName) {
 }
 
 /** Drink menu buckets eligible for free-drink loyalty reward (matches cafe-orders lib/menu-bucket). */
-export function isDrinkLoyaltyCategory(slug, drinkCategorySlugs = DEFAULT_REWARD_DRINK_CATEGORY_SLUGS) {
+export function isDrinkLoyaltyCategory(
+  slug,
+  drinkCategorySlugs = DEFAULT_REWARD_DRINK_CATEGORY_SLUGS
+) {
   return Array.isArray(drinkCategorySlugs) && drinkCategorySlugs.includes(slug);
 }

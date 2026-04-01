@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { cartHasEligibleDrinkForReward, computeRewardDiscountPenceForCart } from '../../lib/loyaltyDiscount';
+import {
+  cartHasEligibleDrinkForReward,
+  computeRewardDiscountPenceForCart,
+} from '../../lib/loyaltyDiscount';
 
 export function useRewardPricing({
   isFreshStripeCheckout,
@@ -25,7 +28,13 @@ export function useRewardPricing({
             rewardConfig?.drinkCategorySlugs
           )
         : 0,
-    [applyReward, eligibleForReward, items, loyaltyConfig?.rewardMaxPence, rewardConfig?.drinkCategorySlugs]
+    [
+      applyReward,
+      eligibleForReward,
+      items,
+      loyaltyConfig?.rewardMaxPence,
+      rewardConfig?.drinkCategorySlugs,
+    ]
   );
 
   return { eligibleForReward, rewardDiscountPence };

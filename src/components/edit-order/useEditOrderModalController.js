@@ -53,7 +53,9 @@ export function useEditOrderModalController({ orderId, open, authFetch, onSaved,
         const o = await fetchCustomerOrder(authFetch, orderId);
         if (cancelled) return;
         setIsPaidViaStripe(Boolean(o.is_paid_via_stripe));
-        const ag = Array.isArray(o.allergens) ? o.allergens.map((x) => String(x).trim()).filter(Boolean) : [];
+        const ag = Array.isArray(o.allergens)
+          ? o.allergens.map((x) => String(x).trim()).filter(Boolean)
+          : [];
         setAllergens(ag);
         setAllergyToggle(ag.length > 0);
         setPickupMinutes(pickupIsoToStepperMinutes(o.pickup_time));

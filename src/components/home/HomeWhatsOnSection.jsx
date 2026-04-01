@@ -30,7 +30,8 @@ export default function HomeWhatsOnSection() {
             margin: '0 0 18px',
           }}
         >
-          Something&apos;s always happening at Clay & Bean — come for the coffee, stay for the moment.
+          Something&apos;s always happening at Clay & Bean — come for the coffee, stay for the
+          moment.
         </p>
       </div>
 

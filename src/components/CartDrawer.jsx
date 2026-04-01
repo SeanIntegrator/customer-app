@@ -18,7 +18,10 @@ import CartDrawerSuccessPane from './cart/CartDrawerSuccessPane';
 import CartDrawerScrollBody from './cart/CartDrawerScrollBody';
 import CartDrawerCheckoutFooter from './cart/CartDrawerCheckoutFooter';
 import { DEFAULT_PICKUP_MINUTES, adjustPickupStepper } from '../lib/pickup';
-import { previewStampsEarnedForOrderTotal, penceNeededForNextStamp } from '../lib/loyaltyStampPreview';
+import {
+  previewStampsEarnedForOrderTotal,
+  penceNeededForNextStamp,
+} from '../lib/loyaltyStampPreview';
 import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
 import { useRewardPricing } from './cart/useRewardPricing';
 
@@ -83,8 +86,7 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
   }, [open]);
 
   const isUpdateEditMode = editOrderId != null && addingToOrderId == null;
-  const basketLocked =
-    orderModifyLocked && (editOrderId != null || addingToOrderId != null);
+  const basketLocked = orderModifyLocked && (editOrderId != null || addingToOrderId != null);
   /** Block quantity / line edit for new basket lines when pickup is too soon. */
   const lineEditsBlocked = (item) =>
     basketLocked && (addingToOrderId != null || !item.fromExistingOrder);
@@ -95,7 +97,10 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
     () => existingItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0),
     [existingItems]
   );
-  const newSubtotal = useMemo(() => newItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0), [newItems]);
+  const newSubtotal = useMemo(
+    () => newItems.reduce((s, i) => s + i.totalPrice * i.quantity, 0),
+    [newItems]
+  );
 
   const isFreshStripeCheckout = addingToOrderId == null && editOrderId == null;
   const { eligibleForReward, rewardDiscountPence } = useRewardPricing({
@@ -287,7 +292,13 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
             ) : (
               <>
                 <CartDrawerHeader
-                  title={addingToOrderId != null ? 'Add to order' : editOrderId != null ? 'Update order' : 'Your order'}
+                  title={
+                    addingToOrderId != null
+                      ? 'Add to order'
+                      : editOrderId != null
+                        ? 'Update order'
+                        : 'Your order'
+                  }
                   onClose={handleSheetClose}
                   onGreenHeaderPointerDown={onGreenHeaderPointerDown}
                 />
@@ -313,6 +324,7 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
                   existingSubtotal={existingSubtotal}
                   newSubtotal={newSubtotal}
                   eligibleForReward={eligibleForReward}
+                  rewardDiscountPence={rewardDiscountPence}
                   reward={reward}
                   loyaltyConfig={loyaltyConfig}
                   items={items}

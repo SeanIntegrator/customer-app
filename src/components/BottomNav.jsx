@@ -8,8 +8,18 @@ const tabs = [
     to: '/',
     label: 'Home',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l9-9 9 9M4.5 10.5V20a1 1 0 001 1h4.5v-5h4v5H18a1 1 0 001-1v-9.5" />
+      <svg
+        viewBox="0 0 24 24"
+        fill={active ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={active ? 0 : 1.8}
+        className="w-6 h-6"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M3 12l9-9 9 9M4.5 10.5V20a1 1 0 001 1h4.5v-5h4v5H18a1 1 0 001-1v-9.5"
+        />
       </svg>
     ),
   },
@@ -17,8 +27,18 @@ const tabs = [
     to: '/order',
     label: 'Order',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 2a1 1 0 011 1v1h6V3a1 1 0 112 0v1h1a2 2 0 012 2v13a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h1V3a1 1 0 011-1zM6 8v11h12V8H6z" />
+      <svg
+        viewBox="0 0 24 24"
+        fill={active ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={active ? 0 : 1.8}
+        className="w-6 h-6"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M8 2a1 1 0 011 1v1h6V3a1 1 0 112 0v1h1a2 2 0 012 2v13a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h1V3a1 1 0 011-1zM6 8v11h12V8H6z"
+        />
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6M9 15h4" />
       </svg>
     ),
@@ -27,8 +47,18 @@ const tabs = [
     to: '/profile',
     label: 'Me',
     icon: (active) => (
-      <svg viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth={active ? 0 : 1.8} className="w-6 h-6">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 12a5 5 0 100-10 5 5 0 000 10zM3.5 21a8.5 8.5 0 0117 0" />
+      <svg
+        viewBox="0 0 24 24"
+        fill={active ? 'currentColor' : 'none'}
+        stroke="currentColor"
+        strokeWidth={active ? 0 : 1.8}
+        className="w-6 h-6"
+      >
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M12 12a5 5 0 100-10 5 5 0 000 10zM3.5 21a8.5 8.5 0 0117 0"
+        />
       </svg>
     ),
   },
@@ -77,7 +107,9 @@ export default function BottomNav() {
                 className={`flex flex-col items-center gap-1 ${active ? 'text-cream' : 'text-cream/60'}`}
               >
                 {iconNode}
-                <span className={`text-[10px] font-sans font-semibold tracking-wide uppercase ${active ? 'text-cream' : 'text-cream/60'}`}>
+                <span
+                  className={`text-[10px] font-sans font-semibold tracking-wide uppercase ${active ? 'text-cream' : 'text-cream/60'}`}
+                >
                   {tab.label}
                 </span>
               </motion.div>

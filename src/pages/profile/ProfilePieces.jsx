@@ -1,7 +1,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const STAR_LABELS = ['', 'Not for me', 'It was alright', 'Pretty good', 'Loved it', 'Absolutely brilliant'];
+const STAR_LABELS = [
+  '',
+  'Not for me',
+  'It was alright',
+  'Pretty good',
+  'Loved it',
+  'Absolutely brilliant',
+];
 
 export function StarRating({ value, onChange }) {
   const [hover, setHover] = useState(0);
@@ -59,7 +66,14 @@ export function StarRating({ value, onChange }) {
 
 export function SectionHead({ label, title, action }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+      }}
+    >
       <div>
         <p
           style={{

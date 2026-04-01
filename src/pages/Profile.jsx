@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { EVENTS } from '../data/mock';
 import { filterAttended, filterRegisteredUpcoming } from '../lib/eventsSchedule';
 import { useCart } from '../context/CartContext';
@@ -14,6 +14,8 @@ import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 import { StarRating, SectionHead } from './profile/ProfilePieces';
 import ProfileHeroBand from './profile/ProfileHeroBand';
 import ProfileOrderHistorySection from './profile/ProfileOrderHistorySection';
+import ProfileGuestSignInSection from './profile/ProfileGuestSignInSection';
+import ProfileActiveOrderCard from './profile/ProfileActiveOrderCard';
 import {
   PROFILE_GRAIN,
   EVENT_GRADIENTS,
@@ -24,12 +26,13 @@ import {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { activeOrder, clearActiveOrder, replaceCartLines, editOrderId, addingToOrderId } = useCart();
+  const { activeOrder, clearActiveOrder, replaceCartLines, editOrderId, addingToOrderId } =
+    useCart();
   const { user, isAuthenticated, logout, loading, authFetch } = useAuth();
   const {
     stampsCount,
     stampsGoal,
-    stampsToNextReward,
+    stampsToNextReward: _stampsToNextReward,
     rewardsAvailable,
     loading: loyaltyLoading,
     error: loyaltyError,
@@ -105,7 +108,8 @@ export default function Profile() {
   const attendedEvents = filterAttended(events);
   const displayName = user?.displayName ?? 'Guest';
   const profileInitials = user ? initialsFromName(user.displayName) : 'G';
-  const heroFirstName = isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Friend.';
+  const heroFirstName =
+    isAuthenticated && user ? `${user.displayName.split(/\s+/)[0]}.` : 'Friend.';
   const memberSinceLabel = user?.createdAt ? formatMemberSince(user.createdAt) : null;
   const orderCount = user?.orderCount ?? 0;
   const eventsEngagementCount = attendedEvents.length + upcomingEvents.length;
@@ -134,7 +138,8 @@ export default function Profile() {
   }, [filteredCompletedOrders.length]);
 
   const handleRate = (id, stars) => setRatings((r) => ({ ...r, [id]: stars }));
-  const toggleEvent = (id) => setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
+  const toggleEvent = (id) =>
+    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, registered: !e.registered } : e)));
 
   const handleLoadUsualToCart = async () => {
     if (hasExistingOrderInProgress || !usualResult?.items?.length) return;
@@ -169,139 +174,9 @@ export default function Profile() {
       />
       {/* ── PAGE BODY ─────────────────────────────────────────────── */}
       <div style={{ padding: '32px 18px 72px', display: 'flex', flexDirection: 'column', gap: 36 }}>
+        {!loading && !isAuthenticated && <ProfileGuestSignInSection />}
 
-        {!loading && !isAuthenticated && (
-          <motion.section
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            style={{
-              background: 'linear-gradient(148deg, #fef9f0, #f5ead8)',
-              border: '1.5px solid #e0d0b0',
-              borderRadius: 20,
-              padding: '20px 18px',
-              textAlign: 'center',
-            }}
-          >
-            <p
-              style={{
-                fontFamily: 'Fraunces, Georgia, serif',
-                fontSize: 17,
-                fontWeight: 800,
-                color: '#1a2e1a',
-                margin: '0 0 6px',
-              }}
-            >
-              Sign in to get started
-            </p>
-            <p
-              style={{
-                fontFamily: 'Plus Jakarta Sans, sans-serif',
-                fontSize: 12,
-                color: 'rgba(26,46,26,0.5)',
-                margin: '0 0 16px',
-                lineHeight: 1.45,
-              }}
-            >
-              Place orders, save your usual, and join events with your Google account.
-            </p>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <SignInButton />
-            </div>
-          </motion.section>
-        )}
-
-        {/* ── CURRENT ORDER ───────────────────────────────────────── */}
-        <AnimatePresence>
-          {activeOrder && (
-            <motion.section
-              key="current-order"
-              initial={{ opacity: 0, y: 18 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -12, height: 0, marginBottom: 0 }}
-              transition={{ type: 'spring', stiffness: 260, damping: 28 }}
-            >
-              <SectionHead
-                label="In progress"
-                title="Current order"
-                action={
-                  <motion.button
-                    whileTap={{ scale: 0.92 }}
-                    onClick={clearActiveOrder}
-                    style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, color: 'rgba(26,46,26,0.5)', background: 'rgba(26,46,26,0.07)', border: '1.5px solid #d4c0a0', borderRadius: 100, padding: '5px 13px', cursor: 'pointer' }}
-                  >
-                    Dismiss
-                  </motion.button>
-                }
-              />
-
-              <div style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', boxShadow: '0 6px 28px rgba(0,0,0,0.14)' }}>
-                {/* Dark green header */}
-                <div style={{ background: 'linear-gradient(138deg, #0e1c0e 0%, #1a2e1a 60%, #223828 100%)', padding: '18px 18px 16px', position: 'relative', overflow: 'hidden' }}>
-                  <motion.div
-                    style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'radial-gradient(circle, rgba(200,144,42,0.25) 0%, transparent 65%)', pointerEvents: 'none' }}
-                    animate={{ scale: [1, 1.3, 1], opacity: [0.6, 1, 0.6] }}
-                    transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-                  />
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {/* Spinner */}
-                    <div style={{ position: 'relative', flexShrink: 0 }}>
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                        style={{ width: 36, height: 36 }}
-                      >
-                        <svg viewBox="0 0 36 36" fill="none" style={{ width: 36, height: 36 }}>
-                          <circle cx="18" cy="18" r="15" stroke="rgba(200,144,42,0.2)" strokeWidth="3" />
-                          <path d="M18 3 A15 15 0 0 1 33 18" stroke="#c8902a" strokeWidth="3" strokeLinecap="round" />
-                        </svg>
-                      </motion.div>
-                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>☕</div>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 17, fontWeight: 800, color: '#f0e6d0', letterSpacing: '-0.02em', lineHeight: 1.2 }}>
-                        Order being prepared
-                      </p>
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(240,230,208,0.55)' }}>
-                        {activeOrder.pickupMinutes === 0 ? 'Ready as soon as possible' : `Pickup in ~${activeOrder.pickupMinutes} mins`}
-                      </p>
-                    </div>
-                    <div style={{ flexShrink: 0, background: 'rgba(200,144,42,0.18)', border: '1px solid rgba(200,144,42,0.3)', borderRadius: 100, padding: '4px 11px' }}>
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, color: '#c8902a', letterSpacing: '0.06em' }}>
-                        ● LIVE
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cream body — items list */}
-                <div style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderTop: 'none', padding: '14px 18px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {activeOrder.items.map((item, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#c8902a', flexShrink: 0 }} />
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#1a2e1a', flex: 1 }}>
-                        {item.quantity > 1 ? `${item.quantity}× ` : ''}{item.name}
-                        {(item.showDrinkModifiers ?? item.showCoffeeOptions) !== false &&
-                          [item.size !== 'Regular' && item.size, item.milk && !['Full Fat', 'Regular'].includes(item.milk) && item.milk].filter(Boolean).length > 0 && (
-                          <span style={{ color: 'rgba(26,46,26,0.45)', fontSize: 11 }}>
-                            {[item.size !== 'Regular' && item.size, item.milk && !['Full Fat', 'Regular'].includes(item.milk) && item.milk].filter(Boolean).map((m) => ` · ${m}`)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  ))}
-                  <div style={{ borderTop: '1px solid rgba(26,46,26,0.08)', marginTop: 6, paddingTop: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>
-                      Total
-                    </p>
-                    <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 20, fontWeight: 900, color: '#1a2e1a', letterSpacing: '-0.03em' }}>
-                      £{(activeOrder.total / 100).toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </motion.section>
-          )}
-        </AnimatePresence>
+        <ProfileActiveOrderCard activeOrder={activeOrder} onDismiss={clearActiveOrder} />
 
         {/* ── LOYALTY CARD ────────────────────────────────────────── */}
         <motion.section
@@ -311,23 +186,72 @@ export default function Profile() {
         >
           <SectionHead label="Rewards" title="Your loyalty card" />
 
-          <div style={{ background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)', borderRadius: 24, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)', border: '1.5px solid #e0d0b0' }}>
+          <div
+            style={{
+              background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)',
+              borderRadius: 24,
+              overflow: 'hidden',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.9)',
+              border: '1.5px solid #e0d0b0',
+            }}
+          >
             <div style={{ position: 'relative' }}>
-              <div style={{ position: 'absolute', inset: 0, backgroundImage: PROFILE_GRAIN, pointerEvents: 'none', opacity: 0.3 }} />
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  backgroundImage: PROFILE_GRAIN,
+                  pointerEvents: 'none',
+                  opacity: 0.3,
+                }}
+              />
 
               {/* Card header row */}
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 18px 12px', borderBottom: '1px solid rgba(26,46,26,0.08)' }}>
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.24em', textTransform: 'uppercase', color: 'rgba(26,46,26,0.4)' }}>
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '16px 18px 12px',
+                  borderBottom: '1px solid rgba(26,46,26,0.08)',
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(26,46,26,0.4)',
+                  }}
+                >
                   Loyalty Card
                 </p>
-                <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 14, fontWeight: 800, color: '#1a2e1a', letterSpacing: '-0.01em' }}>
+                <p
+                  style={{
+                    fontFamily: 'Fraunces, Georgia, serif',
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: '#1a2e1a',
+                    letterSpacing: '-0.01em',
+                  }}
+                >
                   {displayName}
                 </p>
               </div>
 
               {/* Card body: stamps (full width) */}
               <div style={{ position: 'relative', padding: '16px 18px 20px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6, marginBottom: 12 }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(9, 1fr)',
+                    gap: 6,
+                    marginBottom: 12,
+                  }}
+                >
                   {Array.from({ length: stampsGoal }).map((_, i) => {
                     const filled = isAuthenticated && !loyaltyLoading && i < stampsCount;
                     const pending =
@@ -347,7 +271,12 @@ export default function Profile() {
                               ? { scale: 0.94, opacity: 0.88 }
                               : { scale: 0.88, opacity: 0.5 }
                         }
-                        transition={{ type: 'spring', stiffness: 420, damping: 22, delay: filled ? i * 0.04 : 0 }}
+                        transition={{
+                          type: 'spring',
+                          stiffness: 420,
+                          damping: 22,
+                          delay: filled ? i * 0.04 : 0,
+                        }}
                         style={{
                           aspectRatio: '1',
                           borderRadius: '50%',
@@ -364,16 +293,37 @@ export default function Profile() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: filled ? '0 2px 6px rgba(180,120,20,0.28)' : pending ? '0 1px 4px rgba(40,80,40,0.12)' : 'none',
+                          boxShadow: filled
+                            ? '0 2px 6px rgba(180,120,20,0.28)'
+                            : pending
+                              ? '0 1px 4px rgba(40,80,40,0.12)'
+                              : 'none',
                         }}
                       >
-                        {filled && <div style={{ width: '38%', height: '38%', borderRadius: '50%', background: 'rgba(255,245,210,0.65)' }} />}
+                        {filled && (
+                          <div
+                            style={{
+                              width: '38%',
+                              height: '38%',
+                              borderRadius: '50%',
+                              background: 'rgba(255,245,210,0.65)',
+                            }}
+                          />
+                        )}
                       </motion.div>
                     );
                   })}
                 </div>
 
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: '#1a2e1a',
+                    marginBottom: 2,
+                  }}
+                >
                   {loyaltyLoading
                     ? 'Loading…'
                     : !isAuthenticated
@@ -382,17 +332,42 @@ export default function Profile() {
                 </p>
 
                 {loyaltyError ? (
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: '#b34a2a', marginTop: 8 }}>{loyaltyError}</p>
+                  <p
+                    style={{
+                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      fontSize: 11,
+                      color: '#b34a2a',
+                      marginTop: 8,
+                    }}
+                  >
+                    {loyaltyError}
+                  </p>
                 ) : null}
-                <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.35)', marginTop: 8, fontStyle: 'italic' }}>
+                <p
+                  style={{
+                    fontFamily: 'Plus Jakarta Sans, sans-serif',
+                    fontSize: 11,
+                    color: 'rgba(26,46,26,0.35)',
+                    marginTop: 8,
+                    fontStyle: 'italic',
+                  }}
+                >
                   Earn stamps when you collect a £2+ app order, watch out for promotions!
                 </p>
                 {isAuthenticated && !loyaltyLoading && rewardsAvailable > 0 ? (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.985 }}
-                    animate={{ boxShadow: ['0 12px 36px rgba(26,46,26,0.12)', '0 14px 40px rgba(60,100,60,0.14)', '0 12px 36px rgba(26,46,26,0.12)'] }}
-                    transition={{ boxShadow: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' } }}
+                    animate={{
+                      boxShadow: [
+                        '0 12px 36px rgba(26,46,26,0.12)',
+                        '0 14px 40px rgba(60,100,60,0.14)',
+                        '0 12px 36px rgba(26,46,26,0.12)',
+                      ],
+                    }}
+                    transition={{
+                      boxShadow: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' },
+                    }}
                     onClick={() => navigate('/rewards')}
                     style={{
                       marginTop: 18,
@@ -407,13 +382,21 @@ export default function Profile() {
                       borderRadius: 20,
                       padding: '22px 20px',
                       cursor: 'pointer',
-                      boxShadow: '0 12px 36px rgba(26,46,26,0.12), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
+                      boxShadow:
+                        '0 12px 36px rgba(26,46,26,0.12), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
                     }}
                   >
                     <span style={{ display: 'block', marginBottom: 6 }}>
                       {rewardsAvailable} free drink{rewardsAvailable === 1 ? '' : 's'} waiting ☕
                     </span>
-                    <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, fontWeight: 600, color: 'rgba(26,46,26,0.48)' }}>
+                    <span
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: 'rgba(26,46,26,0.48)',
+                      }}
+                    >
                       View rewards → use at checkout
                     </span>
                   </motion.button>
@@ -432,25 +415,95 @@ export default function Profile() {
           <SectionHead label="Saved order" title="Your usual" />
 
           {!isAuthenticated ? (
-            <div style={{ background: 'rgba(255,255,255,0.45)', border: '1.5px solid #e0d0b0', borderRadius: 18, padding: '22px 18px', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: '#1a2e1a', margin: '0 0 8px' }}>Sign in to see your usual</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.45)', margin: '0 0 14px', lineHeight: 1.45 }}>
-                We detect when you order the same items (including modifiers) more than three times in two months — then you can load that order in one tap.
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.45)',
+                border: '1.5px solid #e0d0b0',
+                borderRadius: 18,
+                padding: '22px 18px',
+                textAlign: 'center',
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: '#1a2e1a',
+                  margin: '0 0 8px',
+                }}
+              >
+                Sign in to see your usual
+              </p>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 12,
+                  color: 'rgba(26,46,26,0.45)',
+                  margin: '0 0 14px',
+                  lineHeight: 1.45,
+                }}
+              >
+                We detect when you order the same items (including modifiers) more than three times
+                in two months — then you can load that order in one tap.
               </p>
               <SignInButton />
             </div>
           ) : ordersLoading ? (
-            <div style={{ padding: '20px', textAlign: 'center', fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 13, color: '#8a7868' }}>Checking your orders…</div>
+            <div
+              style={{
+                padding: '20px',
+                textAlign: 'center',
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: 13,
+                color: '#8a7868',
+              }}
+            >
+              Checking your orders…
+            </div>
           ) : !usualResult ? (
-            <div style={{ background: 'rgba(255,255,255,0.4)', border: '1.5px dashed #d4c0a0', borderRadius: 18, padding: '24px 20px', textAlign: 'center' }}>
-              <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 16, fontWeight: 700, color: 'rgba(26,46,26,0.45)', marginBottom: 6 }}>No usual yet</p>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12, color: 'rgba(26,46,26,0.35)', lineHeight: 1.5 }}>
-                Order the exact same basket (every item and modifier) at least four times within two months — we&apos;ll surface it here so you can reorder instantly.
+            <div
+              style={{
+                background: 'rgba(255,255,255,0.4)',
+                border: '1.5px dashed #d4c0a0',
+                borderRadius: 18,
+                padding: '24px 20px',
+                textAlign: 'center',
+              }}
+            >
+              <p
+                style={{
+                  fontFamily: 'Fraunces, Georgia, serif',
+                  fontSize: 16,
+                  fontWeight: 700,
+                  color: 'rgba(26,46,26,0.45)',
+                  marginBottom: 6,
+                }}
+              >
+                No usual yet
+              </p>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 12,
+                  color: 'rgba(26,46,26,0.35)',
+                  lineHeight: 1.5,
+                }}
+              >
+                Order the exact same basket (every item and modifier) at least four times within two
+                months — we&apos;ll surface it here so you can reorder instantly.
               </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)', margin: 0 }}>
+              <p
+                style={{
+                  fontFamily: 'Plus Jakarta Sans, sans-serif',
+                  fontSize: 11,
+                  color: 'rgba(26,46,26,0.45)',
+                  margin: 0,
+                }}
+              >
                 You&apos;ve ordered this {usualResult.matchCount} times in the last 2 months.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -467,15 +520,42 @@ export default function Profile() {
                       gap: 14,
                     }}
                   >
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(145deg, #f5e5b8, #e8cc88)', border: '2px solid #f0e6d0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(145deg, #f5e5b8, #e8cc88)',
+                        border: '2px solid #f0e6d0',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 20,
+                        flexShrink: 0,
+                      }}
+                    >
                       {it.item_emoji || '☕'}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 15, fontWeight: 700, color: '#1a2e1a', marginBottom: 2 }}>
+                      <p
+                        style={{
+                          fontFamily: 'Fraunces, Georgia, serif',
+                          fontSize: 15,
+                          fontWeight: 700,
+                          color: '#1a2e1a',
+                          marginBottom: 2,
+                        }}
+                      >
                         {it.quantity > 1 ? `${it.quantity}× ` : ''}
                         {it.item_name}
                       </p>
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)' }}>
+                      <p
+                        style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 11,
+                          color: 'rgba(26,46,26,0.45)',
+                        }}
+                      >
                         £{((it.unit_price * it.quantity) / 100).toFixed(2)}
                       </p>
                     </div>
@@ -500,7 +580,9 @@ export default function Profile() {
                   fontSize: 16,
                   fontWeight: 800,
                   cursor: hasExistingOrderInProgress ? 'not-allowed' : 'pointer',
-                  boxShadow: hasExistingOrderInProgress ? 'none' : '0 4px 18px rgba(200,144,42,0.35)',
+                  boxShadow: hasExistingOrderInProgress
+                    ? 'none'
+                    : '0 4px 18px rgba(200,144,42,0.35)',
                 }}
               >
                 {hasExistingOrderInProgress ? 'Order already in progress' : 'Quick order my usual'}
@@ -519,54 +601,166 @@ export default function Profile() {
             <SectionHead label="What's coming up" title="You're going to" />
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              {upcomingEvents.map((event, idx) => {
+              {upcomingEvents.map((event) => {
                 const eventIdx = EVENTS.findIndex((e) => e.id === event.id);
                 const gradient = EVENT_GRADIENTS[eventIdx % EVENT_GRADIENTS.length];
                 return (
                   <motion.div
                     key={event.id}
-                    style={{ position: 'relative', borderRadius: 22, overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,0.18)' }}
+                    style={{
+                      position: 'relative',
+                      borderRadius: 22,
+                      overflow: 'hidden',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.18)',
+                    }}
                   >
                     {/* Background */}
                     <div style={{ position: 'absolute', inset: 0, background: gradient }} />
-                    <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.55) 100%)' }} />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        background:
+                          'linear-gradient(to bottom, rgba(0,0,0,0.08) 0%, rgba(0,0,0,0.55) 100%)',
+                      }}
+                    />
 
                     {/* Content */}
                     <div style={{ position: 'relative', padding: '18px 18px 16px' }}>
                       {/* Top row */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          justifyContent: 'space-between',
+                          marginBottom: 12,
+                        }}
+                      >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+                          <div
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '50%',
+                              background: 'rgba(255,255,255,0.15)',
+                              backdropFilter: 'blur(6px)',
+                              border: '1px solid rgba(255,255,255,0.2)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 20,
+                            }}
+                          >
                             {event.emoji}
                           </div>
                           <div>
-                            <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.65)', marginBottom: 2 }}>
+                            <p
+                              style={{
+                                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                fontSize: 9,
+                                fontWeight: 700,
+                                letterSpacing: '0.14em',
+                                textTransform: 'uppercase',
+                                color: 'rgba(255,255,255,0.65)',
+                                marginBottom: 2,
+                              }}
+                            >
                               {event.date} · {event.time}
                             </p>
-                            <h3 style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                            <h3
+                              style={{
+                                fontFamily: 'Fraunces, Georgia, serif',
+                                fontSize: 18,
+                                fontWeight: 800,
+                                color: '#fff',
+                                letterSpacing: '-0.02em',
+                                lineHeight: 1.1,
+                              }}
+                            >
                               {event.title}
                             </h3>
                           </div>
                         </div>
-                        <div style={{ background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.25)', borderRadius: 100, padding: '4px 11px', fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 10, fontWeight: 700, color: '#fff', letterSpacing: '0.06em', flexShrink: 0 }}>
+                        <div
+                          style={{
+                            background: 'rgba(255,255,255,0.18)',
+                            backdropFilter: 'blur(6px)',
+                            border: '1px solid rgba(255,255,255,0.25)',
+                            borderRadius: 100,
+                            padding: '4px 11px',
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: '#fff',
+                            letterSpacing: '0.06em',
+                            flexShrink: 0,
+                          }}
+                        >
                           ✓ Going
                         </div>
                       </div>
 
                       {/* Description */}
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12.5, color: 'rgba(255,255,255,0.78)', lineHeight: 1.55, marginBottom: 14, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      <p
+                        style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 12.5,
+                          color: 'rgba(255,255,255,0.78)',
+                          lineHeight: 1.55,
+                          marginBottom: 14,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                        }}
+                      >
                         {event.description}
                       </p>
 
                       {/* Footer row */}
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                        <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: event.spotsLeft != null && event.spotsLeft <= 3 ? '#ffaa80' : 'rgba(255,255,255,0.5)', letterSpacing: '0.04em' }}>
-                          {event.spotsLeft == null ? '● Drop in anytime' : event.spotsLeft === 0 ? '● Full' : event.spotsLeft <= 3 ? `● Only ${event.spotsLeft} spots left!` : `● ${event.spotsLeft} of ${event.totalSpots} spots left`}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color:
+                              event.spotsLeft != null && event.spotsLeft <= 3
+                                ? '#ffaa80'
+                                : 'rgba(255,255,255,0.5)',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          {event.spotsLeft == null
+                            ? '● Drop in anytime'
+                            : event.spotsLeft === 0
+                              ? '● Full'
+                              : event.spotsLeft <= 3
+                                ? `● Only ${event.spotsLeft} spots left!`
+                                : `● ${event.spotsLeft} of ${event.totalSpots} spots left`}
                         </span>
                         <motion.button
                           whileTap={{ scale: 0.9 }}
                           onClick={() => toggleEvent(event.id)}
-                          style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 100, padding: '6px 14px', cursor: 'pointer', letterSpacing: '0.03em', backdropFilter: 'blur(4px)' }}
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: 'rgba(255,255,255,0.7)',
+                            background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: 100,
+                            padding: '6px 14px',
+                            cursor: 'pointer',
+                            letterSpacing: '0.03em',
+                            backdropFilter: 'blur(4px)',
+                          }}
                         >
                           Cancel booking
                         </motion.button>
@@ -606,36 +800,103 @@ export default function Profile() {
               {attendedEvents.map((event) => (
                 <div
                   key={event.id}
-                  style={{ background: 'linear-gradient(148deg, #fef9f0, #f5ead8)', border: '1.5px solid #e0d0b0', borderRadius: 20, padding: '18px 18px 16px' }}
+                  style={{
+                    background: 'linear-gradient(148deg, #fef9f0, #f5ead8)',
+                    border: '1.5px solid #e0d0b0',
+                    borderRadius: 20,
+                    padding: '18px 18px 16px',
+                  }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-                    <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'linear-gradient(145deg, #e8e0d0, #d4c8b0)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: '50%',
+                        background: 'linear-gradient(145deg, #e8e0d0, #d4c8b0)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 20,
+                        flexShrink: 0,
+                      }}
+                    >
                       {event.emoji}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
-                        <p style={{ fontFamily: 'Fraunces, Georgia, serif', fontSize: 15, fontWeight: 700, color: '#1a2e1a' }}>
+                      <div
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}
+                      >
+                        <p
+                          style={{
+                            fontFamily: 'Fraunces, Georgia, serif',
+                            fontSize: 15,
+                            fontWeight: 700,
+                            color: '#1a2e1a',
+                          }}
+                        >
                           {event.title}
                         </p>
-                        <span style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#7a9a78', background: '#d4e8d0', padding: '2px 8px', borderRadius: 100, flexShrink: 0 }}>
+                        <span
+                          style={{
+                            fontFamily: 'Plus Jakarta Sans, sans-serif',
+                            fontSize: 9,
+                            fontWeight: 700,
+                            letterSpacing: '0.1em',
+                            textTransform: 'uppercase',
+                            color: '#7a9a78',
+                            background: '#d4e8d0',
+                            padding: '2px 8px',
+                            borderRadius: 100,
+                            flexShrink: 0,
+                          }}
+                        >
                           ✓ Attended
                         </span>
                       </div>
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, color: 'rgba(26,46,26,0.45)' }}>
+                      <p
+                        style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          fontSize: 11,
+                          color: 'rgba(26,46,26,0.45)',
+                        }}
+                      >
                         {event.date}
                         {event.time ? ` · ${event.time}` : ''}
                       </p>
                     </div>
                   </div>
 
-                  <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 12.5, color: 'rgba(26,46,26,0.65)', lineHeight: 1.55, marginBottom: 14 }}>
+                  <p
+                    style={{
+                      fontFamily: 'Plus Jakarta Sans, sans-serif',
+                      fontSize: 12.5,
+                      color: 'rgba(26,46,26,0.65)',
+                      lineHeight: 1.55,
+                      marginBottom: 14,
+                    }}
+                  >
                     {event.description}
                   </p>
 
                   <div style={{ height: 1, background: 'rgba(26,46,26,0.08)', marginBottom: 12 }} />
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', fontSize: 11, fontWeight: 600, color: ratings[event.id] ? '#c8902a' : 'rgba(26,46,26,0.4)', letterSpacing: '0.02em' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontFamily: 'Plus Jakarta Sans, sans-serif',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: ratings[event.id] ? '#c8902a' : 'rgba(26,46,26,0.4)',
+                        letterSpacing: '0.02em',
+                      }}
+                    >
                       {ratings[event.id] ? 'Your rating' : 'Rate this event'}
                     </p>
                     <StarRating
@@ -648,7 +909,6 @@ export default function Profile() {
             </div>
           </motion.section>
         ) : null}
-
       </div>
     </motion.div>
   );

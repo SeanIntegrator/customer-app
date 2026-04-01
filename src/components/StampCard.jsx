@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-export default function StampCard({ stamps = 0, goal = 9, compact = false }) {
+export default function StampCard({ stamps = 0, goal = 9, compact: _compact = false }) {
   const remaining = goal - stamps;
 
   return (
@@ -37,9 +37,7 @@ export default function StampCard({ stamps = 0, goal = 9, compact = false }) {
                 delay: filled ? i * 0.05 : 0,
               }}
               className={`aspect-square rounded-full flex items-center justify-center text-[10px] transition-colors ${
-                filled
-                  ? 'bg-clay border border-clay/50'
-                  : 'border border-cream/20'
+                filled ? 'bg-clay border border-clay/50' : 'border border-cream/20'
               }`}
             >
               {filled && (
@@ -58,9 +56,7 @@ export default function StampCard({ stamps = 0, goal = 9, compact = false }) {
           {stamps}/{goal} stamps
         </p>
         <p className="text-cream/90 text-xs font-sans font-semibold">
-          {remaining === 0
-            ? '🎉 Free coffee ready!'
-            : `${remaining} until your free coffee`}
+          {remaining === 0 ? '🎉 Free coffee ready!' : `${remaining} until your free coffee`}
         </p>
       </div>
     </div>

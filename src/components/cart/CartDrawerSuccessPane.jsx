@@ -17,7 +17,15 @@ export default function CartDrawerSuccessPane({
   onGreenHeaderPointerDown,
 }) {
   return (
-    <div style={{ position: 'relative', flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{
+        position: 'relative',
+        flex: 1,
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
       <div
         role="presentation"
         aria-hidden

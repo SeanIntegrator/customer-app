@@ -5,7 +5,8 @@ export const EVENTS = [
     date: 'Sat 12 Apr',
     time: '9:00 – 11:00am',
     startsAt: '2026-04-12T08:00:00.000Z',
-    description: 'Bring your sketchbook and let the morning light guide your pencil while the coffee keeps you warm. We supply the brews, you bring the curiosity — all levels welcome.',
+    description:
+      'Bring your sketchbook and let the morning light guide your pencil while the coffee keeps you warm. We supply the brews, you bring the curiosity — all levels welcome.',
     spotsLeft: 4,
     totalSpots: 12,
     emoji: '🎨',
@@ -18,7 +19,8 @@ export const EVENTS = [
     date: 'Thu 17 Apr',
     time: '6:30 – 8:30pm',
     startsAt: '2026-04-17T17:30:00.000Z',
-    description: 'A guided journey through small-batch natural wines sourced from passionate local producers who let the land do the talking. No stuffy formality — just great wine and even better conversation.',
+    description:
+      'A guided journey through small-batch natural wines sourced from passionate local producers who let the land do the talking. No stuffy formality — just great wine and even better conversation.',
     spotsLeft: 8,
     totalSpots: 20,
     emoji: '🍷',
@@ -31,7 +33,8 @@ export const EVENTS = [
     date: 'Sun 20 Apr',
     time: '10:00am – 12:00pm',
     startsAt: '2026-04-20T09:00:00.000Z',
-    description: "Bring a book you loved and leave with one you haven't read yet — the best kind of serendipity. Coffee discounts run all morning to fuel your next chapter.",
+    description:
+      "Bring a book you loved and leave with one you haven't read yet — the best kind of serendipity. Coffee discounts run all morning to fuel your next chapter.",
     spotsLeft: null,
     totalSpots: null,
     emoji: '📚',
@@ -44,7 +47,8 @@ export const EVENTS = [
     date: 'Sat 3 May',
     time: '11:00am – 1:00pm',
     startsAt: '2026-05-03T10:00:00.000Z',
-    description: "Get your hands in the dough and learn the ancient craft of sourdough from our head baker, who's been nursing the same starter for over a decade. You'll leave with technique, knowledge, and a jar of live culture to take home.",
+    description:
+      "Get your hands in the dough and learn the ancient craft of sourdough from our head baker, who's been nursing the same starter for over a decade. You'll leave with technique, knowledge, and a jar of live culture to take home.",
     spotsLeft: 2,
     totalSpots: 8,
     emoji: '🍞',
@@ -66,7 +70,7 @@ export const PROMOTIONS = [
   {
     id: 2,
     title: 'Loyalty Freebie Unlocked',
-    description: "3 more stamps and your next coffee is on us.",
+    description: '3 more stamps and your next coffee is on us.',
     tag: '3 away',
     emoji: '☕',
     bg: 'bg-clay',
@@ -111,7 +115,8 @@ export function getPriceForItem(name, squarePrice) {
 
 export function getEmojiForItem(name) {
   const n = (name || '').toLowerCase();
-  if (['latte', 'flat white', 'cappuccino', 'mocha', 'cortado'].some((w) => n.includes(w))) return '☕';
+  if (['latte', 'flat white', 'cappuccino', 'mocha', 'cortado'].some((w) => n.includes(w)))
+    return '☕';
   if (['espresso', 'americano'].some((w) => n.includes(w))) return '⚡';
   if (['matcha'].some((w) => n.includes(w))) return '🍵';
   if (['chai', 'tea'].some((w) => n.includes(w))) return '🫖';
@@ -124,38 +129,61 @@ export function getEmojiForItem(name) {
 
 export function getCategoryForItem(name) {
   const n = (name || '').toLowerCase();
-  if (['coffee', 'latte', 'flat white', 'cappuccino', 'americano', 'espresso', 'mocha', 'macchiato', 'cortado'].some((w) => n.includes(w))) return 'coffee';
+  if (
+    [
+      'coffee',
+      'latte',
+      'flat white',
+      'cappuccino',
+      'americano',
+      'espresso',
+      'mocha',
+      'macchiato',
+      'cortado',
+    ].some((w) => n.includes(w))
+  )
+    return 'coffee';
   if (['tea', 'matcha', 'chai'].some((w) => n.includes(w))) return 'tea';
-  if (['croissant', 'pain', 'toast', 'cake', 'muffin', 'bagel', 'sandwich', 'wrap', 'swirl', 'bun', 'scone', 'brownie', 'cookie', 'flapjack'].some((w) => n.includes(w))) return 'food';
+  if (
+    [
+      'croissant',
+      'pain',
+      'toast',
+      'cake',
+      'muffin',
+      'bagel',
+      'sandwich',
+      'wrap',
+      'swirl',
+      'bun',
+      'scone',
+      'brownie',
+      'cookie',
+      'flapjack',
+    ].some((w) => n.includes(w))
+  )
+    return 'food';
   return 'specials';
 }
 
-// Milk modifiers with price delta (pence) — fallback when API unavailable
-export const MILK_OPTIONS = [
-  { name: 'Full Fat', delta: 0 },
-  { name: 'Oat', delta: 50 },
-  { name: 'Almond', delta: 50 },
-  { name: 'Soy', delta: 50 },
-  { name: 'Coconut', delta: 50 },
-  { name: 'Skinny', delta: 0 },
-];
+export { MILK_OPTIONS, SIZE_OPTIONS, SYRUP_OPTIONS } from './modifierDefaults.js';
 
 // Syrup chip colour palette — keyword-matched by modifier name from Square
 const SYRUP_CHIP_COLORS = {
-  caramel:         { bg: '#7B4A1E', text: '#F5DEB3' },
-  vanilla:         { bg: '#C8A96E', text: '#3D2B1F' },
-  hazelnut:        { bg: '#5C3317', text: '#F0DEC8' },
+  caramel: { bg: '#7B4A1E', text: '#F5DEB3' },
+  vanilla: { bg: '#C8A96E', text: '#3D2B1F' },
+  hazelnut: { bg: '#5C3317', text: '#F0DEC8' },
   'white chocolate': { bg: '#EED8A8', text: '#4A3520' },
-  chocolate:       { bg: '#3D2010', text: '#F0D0A0' },
-  strawberry:      { bg: '#B22040', text: '#FFE8EC' },
-  raspberry:       { bg: '#8B1A4A', text: '#FFD8E8' },
-  blueberry:       { bg: '#2D1B69', text: '#C8B8FF' },
-  lavender:        { bg: '#7B5EA7', text: '#F0E8FF' },
-  mint:            { bg: '#2E7D5E', text: '#E0F5EC' },
-  cinnamon:        { bg: '#A0522D', text: '#FAEBD7' },
-  pumpkin:         { bg: '#C05A1A', text: '#FFE4C4' },
-  coconut:         { bg: '#8B7355', text: '#FFF8F0' },
-  default:         { bg: '#6A5A48', text: '#F0E6D0' },
+  chocolate: { bg: '#3D2010', text: '#F0D0A0' },
+  strawberry: { bg: '#B22040', text: '#FFE8EC' },
+  raspberry: { bg: '#8B1A4A', text: '#FFD8E8' },
+  blueberry: { bg: '#2D1B69', text: '#C8B8FF' },
+  lavender: { bg: '#7B5EA7', text: '#F0E8FF' },
+  mint: { bg: '#2E7D5E', text: '#E0F5EC' },
+  cinnamon: { bg: '#A0522D', text: '#FAEBD7' },
+  pumpkin: { bg: '#C05A1A', text: '#FFE4C4' },
+  coconut: { bg: '#8B7355', text: '#FFF8F0' },
+  default: { bg: '#6A5A48', text: '#F0E6D0' },
 };
 
 export function getSyrupChipColors(name) {
@@ -165,15 +193,6 @@ export function getSyrupChipColors(name) {
   }
   return SYRUP_CHIP_COLORS.default;
 }
-
-// Fallback syrup options — empty so section is hidden when API unavailable
-export const SYRUP_OPTIONS = [];
-
-// Size modifiers with price delta (pence)
-export const SIZE_OPTIONS = [
-  { name: 'Regular', delta: 0 },
-  { name: 'Large', delta: 50 },
-];
 
 export const CATEGORIES = [
   { id: 'all', label: 'All' },

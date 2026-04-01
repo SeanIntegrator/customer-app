@@ -26,7 +26,12 @@ function simpleHash(s) {
 }
 
 function idSuffix(categoryId, label) {
-  if (categoryId) return String(categoryId).replace(/[^A-Za-z0-9]/g, '').slice(-6) || simpleHash(label);
+  if (categoryId)
+    return (
+      String(categoryId)
+        .replace(/[^A-Za-z0-9]/g, '')
+        .slice(-6) || simpleHash(label)
+    );
   return simpleHash(label);
 }
 

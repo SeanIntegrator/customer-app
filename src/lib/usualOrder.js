@@ -64,13 +64,20 @@ export function findUsualOrderFromHistory(orders, windowMs = DEFAULT_WINDOW_MS) 
   for (const o of recent) {
     const fp = orderFingerprintForUsual(o);
     if (!fp) continue;
-    const cur = fpMap.get(fp) || { count: 0, lastTs: 0, representativeItems: null, representativeAllergens: [] };
+    const cur = fpMap.get(fp) || {
+      count: 0,
+      lastTs: 0,
+      representativeItems: null,
+      representativeAllergens: [],
+    };
     cur.count += 1;
     const ts = new Date(o.created_at).getTime();
     if (ts >= cur.lastTs) {
       cur.lastTs = ts;
       cur.representativeItems = o.items;
-      cur.representativeAllergens = Array.isArray(o.allergens) ? o.allergens.map((x) => String(x).trim()).filter(Boolean) : [];
+      cur.representativeAllergens = Array.isArray(o.allergens)
+        ? o.allergens.map((x) => String(x).trim()).filter(Boolean)
+        : [];
     }
     fpMap.set(fp, cur);
   }
@@ -99,7 +106,7 @@ export async function apiOrderItemsToCartLines(items) {
   try {
     const enriched = await getEnrichedCatalog();
     variationById = enriched.variationById ?? {};
-  } catch (_) {
+  } catch {
     /* optional */
   }
 

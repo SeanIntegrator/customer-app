@@ -3,18 +3,14 @@ import { useSheetSwipeToClose } from '../lib/useSheetSwipeToClose';
 import { useAuth } from '../context/AuthContext';
 import OrderSuccess from './OrderSuccess';
 import AllergyChipsInput from './AllergyChipsInput';
-import {
-  PAPER_GRAIN_BACKGROUND,
-  PICKUP_STEP,
-  checkoutStepperButtonStyle,
-  formatPickupTimeShort,
-} from '../lib/pickup';
+import { PICKUP_STEP, checkoutStepperButtonStyle, formatPickupTimeShort } from '../lib/pickup';
 import {
   CHECKOUT_PRIMARY_GRADIENT,
   CHECKOUT_PRIMARY_SHADOW,
   CHECKOUT_PRIMARY_TEXT,
 } from '../lib/checkoutTheme';
 import { useEditOrderModalController } from './edit-order/useEditOrderModalController';
+import EditOrderModalSheetHeader from './edit-order/EditOrderModalSheetHeader';
 
 const stepperBtn = checkoutStepperButtonStyle;
 
@@ -122,65 +118,10 @@ export default function EditOrderModal({
               </div>
             ) : (
               <>
-                <div
-                  onPointerDown={onGreenHeaderPointerDown}
-                  style={{
-                    flexShrink: 0,
-                    background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
-                    position: 'relative',
-                    touchAction: 'none',
-                  }}
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      backgroundImage: PAPER_GRAIN_BACKGROUND,
-                      backgroundRepeat: 'repeat',
-                      pointerEvents: 'none',
-                    }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12 }}>
-                    <div style={{ width: 40, height: 4, background: 'rgba(240,230,208,0.3)', borderRadius: 100 }} />
-                  </div>
-                  <div
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '12px 20px 18px',
-                      position: 'relative',
-                    }}
-                  >
-                    <h2
-                      style={{
-                        fontFamily: 'Fraunces, Georgia, serif',
-                        fontSize: 20,
-                        fontWeight: 800,
-                        color: '#f0e6d0',
-                        margin: 0,
-                      }}
-                    >
-                      Edit order
-                    </h2>
-                    <button
-                      type="button"
-                      onPointerDown={(e) => e.stopPropagation()}
-                      onClick={onClose}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '50%',
-                        background: 'rgba(240,230,208,0.15)',
-                        border: '1.5px solid rgba(240,230,208,0.2)',
-                        color: '#f0e6d0',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                </div>
+                <EditOrderModalSheetHeader
+                  onGreenHeaderPointerDown={onGreenHeaderPointerDown}
+                  onClose={onClose}
+                />
 
                 <div
                   style={{
@@ -195,12 +136,19 @@ export default function EditOrderModal({
                     style={{ padding: '16px 20px' }}
                   >
                     {loading && (
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', color: 'rgba(26,46,26,0.5)' }}>
+                      <p
+                        style={{
+                          fontFamily: 'Plus Jakarta Sans, sans-serif',
+                          color: 'rgba(26,46,26,0.5)',
+                        }}
+                      >
                         Loading…
                       </p>
                     )}
                     {!loading && error && !lines.length && (
-                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#b34a2a' }}>{error}</p>
+                      <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#b34a2a' }}>
+                        {error}
+                      </p>
                     )}
                     {!loading && !editable && (
                       <p style={{ fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#8a6a48' }}>
@@ -230,12 +178,20 @@ export default function EditOrderModal({
                               }}
                             >
                               This order was paid online. To add drinks or food, use{' '}
-                              <strong>Add more items</strong> so we can charge only the new items. Pickup time and line
-                              items cannot be changed here.
+                              <strong>Add more items</strong> so we can charge only the new items.
+                              Pickup time and line items cannot be changed here.
                             </p>
                           </div>
                         )}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16, minHeight: 80 }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 10,
+                            marginBottom: 16,
+                            minHeight: 80,
+                          }}
+                        >
                           {lines.length === 0 && (
                             <p
                               style={{
@@ -246,8 +202,8 @@ export default function EditOrderModal({
                                 lineHeight: 1.45,
                               }}
                             >
-                              No line items left. Add drinks from the menu and save changes from your cart, or close and open
-                              this order again to reload.
+                              No line items left. Add drinks from the menu and save changes from
+                              your cart, or close and open this order again to reload.
                             </p>
                           )}
                           {lines.map((l) => (
@@ -291,7 +247,11 @@ export default function EditOrderModal({
                                 {!isPaidViaStripe ? (
                                   <>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                      <button type="button" onClick={() => bumpQty(l.key, -1)} style={stepperBtn}>
+                                      <button
+                                        type="button"
+                                        onClick={() => bumpQty(l.key, -1)}
+                                        style={stepperBtn}
+                                      >
                                         −
                                       </button>
                                       <span
@@ -305,7 +265,11 @@ export default function EditOrderModal({
                                       >
                                         {l.quantity}
                                       </span>
-                                      <button type="button" onClick={() => bumpQty(l.key, 1)} style={stepperBtn}>
+                                      <button
+                                        type="button"
+                                        onClick={() => bumpQty(l.key, 1)}
+                                        style={stepperBtn}
+                                      >
                                         +
                                       </button>
                                     </div>
@@ -457,7 +421,9 @@ export default function EditOrderModal({
                                     margin: '4px 0 0',
                                   }}
                                 >
-                                  {pickupMinutes === 0 ? 'ASAP' : formatPickupTimeShort(pickupMinutes)}
+                                  {pickupMinutes === 0
+                                    ? 'ASAP'
+                                    : formatPickupTimeShort(pickupMinutes)}
                                 </p>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -480,7 +446,11 @@ export default function EditOrderModal({
                                 >
                                   {pickupMinutes === 0 ? 'ASAP' : `${pickupMinutes}m`}
                                 </span>
-                                <button type="button" onClick={() => adjustPickup(PICKUP_STEP)} style={stepperBtn}>
+                                <button
+                                  type="button"
+                                  onClick={() => adjustPickup(PICKUP_STEP)}
+                                  style={stepperBtn}
+                                >
                                   +
                                 </button>
                               </div>

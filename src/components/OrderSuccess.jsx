@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
 import { previewStampsEarnedForOrderTotal } from '../lib/loyaltyStampPreview';
 
-const GRAIN = "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
+const GRAIN =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='280' height='280'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='280' height='280' filter='url(%23n)' opacity='0.14'/%3E%3C/svg%3E\")";
 
 function futureStampLine(totalPence) {
   const { stamps } = previewStampsEarnedForOrderTotal(totalPence);
-  if (stamps === 0) return "You'll earn stamps when you collect orders of £2+ — this one is under £2.";
+  if (stamps === 0)
+    return "You'll earn stamps when you collect orders of £2+ — this one is under £2.";
   if (stamps === 2) return "You'll earn 2 stamps when you collect — Double Stamp Tuesday.";
   return `You'll earn ${stamps} stamp when you collect.`;
 }
@@ -16,7 +18,12 @@ function futureStampLine(totalPence) {
  * @param {'placed' | 'updated'} [variant]
  * @param {number} [stampPreviewTotalPence] — order total in pence; shows future-tense stamp copy until KDS completes.
  */
-export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'placed', stampPreviewTotalPence }) {
+export default function OrderSuccess({
+  onDone,
+  pickupMinutes = 15,
+  variant = 'placed',
+  stampPreviewTotalPence,
+}) {
   const updated = variant === 'updated';
   const title = updated ? 'Order successfully updated' : 'Order placed!';
   const subline = updated
@@ -41,13 +48,15 @@ export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'pl
       }}
     >
       {/* Grain overlay */}
-      <div style={{
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: GRAIN,
-        backgroundRepeat: 'repeat',
-        pointerEvents: 'none',
-      }} />
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: GRAIN,
+          backgroundRepeat: 'repeat',
+          pointerEvents: 'none',
+        }}
+      />
 
       {/* Check circle */}
       <motion.div
@@ -94,26 +103,30 @@ export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'pl
         transition={{ delay: 0.4 }}
         style={{ position: 'relative' }}
       >
-        <h2 style={{
-          fontFamily: 'Fraunces, Georgia, serif',
-          fontSize: updated ? 28 : 36,
-          fontWeight: 900,
-          color: '#f0e6d0',
-          letterSpacing: '-0.03em',
-          marginBottom: 8,
-          margin: '0 0 8px',
-          lineHeight: 1.15,
-        }}>
+        <h2
+          style={{
+            fontFamily: 'Fraunces, Georgia, serif',
+            fontSize: updated ? 28 : 36,
+            fontWeight: 900,
+            color: '#f0e6d0',
+            letterSpacing: '-0.03em',
+            marginBottom: 8,
+            margin: '0 0 8px',
+            lineHeight: 1.15,
+          }}
+        >
           {title}
         </h2>
-        <p style={{
-          fontFamily: 'Plus Jakarta Sans, sans-serif',
-          fontSize: 14,
-          color: 'rgba(240,230,208,0.6)',
-          marginBottom: 4,
-          margin: '0 0 4px',
-          lineHeight: 1.5,
-        }}>
+        <p
+          style={{
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+            fontSize: 14,
+            color: 'rgba(240,230,208,0.6)',
+            marginBottom: 4,
+            margin: '0 0 4px',
+            lineHeight: 1.5,
+          }}
+        >
           {subline}
         </p>
         {stampLine ? (
@@ -133,15 +146,20 @@ export default function OrderSuccess({ onDone, pickupMinutes = 15, variant = 'pl
             {stampLine}
           </p>
         ) : null}
-        <p style={{
-          fontFamily: 'Plus Jakarta Sans, sans-serif',
-          fontSize: 13,
-          fontWeight: 600,
-          color: '#c8902a',
-          marginBottom: 28,
-          margin: '0 0 28px',
-        }}>
-          ☕ {pickupMinutes === 0 ? 'Ready as soon as possible' : `Ready in approximately ${pickupMinutes} minutes`}
+        <p
+          style={{
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+            fontSize: 13,
+            fontWeight: 600,
+            color: '#c8902a',
+            marginBottom: 28,
+            margin: '0 0 28px',
+          }}
+        >
+          ☕{' '}
+          {pickupMinutes === 0
+            ? 'Ready as soon as possible'
+            : `Ready in approximately ${pickupMinutes} minutes`}
         </p>
 
         <motion.button

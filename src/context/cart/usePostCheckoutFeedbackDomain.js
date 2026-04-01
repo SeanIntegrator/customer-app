@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export function usePostCheckoutFeedbackDomain({
   editOrderId,
@@ -39,8 +39,10 @@ export function usePostCheckoutFeedbackDomain({
       setActiveOrder((prev) => {
         if (!prev) return prev;
         const prevDb = prev.dbOrderId ?? prev.orderId;
-        const matchDb = incomingDb != null && prevDb != null && Number(prevDb) === Number(incomingDb);
-        const matchSq = sq !== '' && prev.squareOrderId != null && String(prev.squareOrderId) === sq;
+        const matchDb =
+          incomingDb != null && prevDb != null && Number(prevDb) === Number(incomingDb);
+        const matchSq =
+          sq !== '' && prev.squareOrderId != null && String(prev.squareOrderId) === sq;
         if (matchDb || matchSq) return null;
         return prev;
       });
@@ -80,14 +82,30 @@ export function usePostCheckoutFeedbackDomain({
         beginPostCheckoutFeedback(feedbackOrderId);
       }
     },
-    [beginPostCheckoutFeedback, setActiveOrder, setAddingToOrderId, setEditOrderId, setItems, setOrderAllergens]
+    [
+      beginPostCheckoutFeedback,
+      setActiveOrder,
+      setAddingToOrderId,
+      setEditOrderId,
+      setItems,
+      setOrderAllergens,
+    ]
   );
 
-  return {
-    postCheckoutFeedbackOrderId,
-    beginPostCheckoutFeedback,
-    clearPostCheckoutFeedback,
-    registerPendingKdsFeedback,
-    applyKdsOrderCompleted,
-  };
+  return useMemo(
+    () => ({
+      postCheckoutFeedbackOrderId,
+      beginPostCheckoutFeedback,
+      clearPostCheckoutFeedback,
+      registerPendingKdsFeedback,
+      applyKdsOrderCompleted,
+    }),
+    [
+      postCheckoutFeedbackOrderId,
+      beginPostCheckoutFeedback,
+      clearPostCheckoutFeedback,
+      registerPendingKdsFeedback,
+      applyKdsOrderCompleted,
+    ]
+  );
 }

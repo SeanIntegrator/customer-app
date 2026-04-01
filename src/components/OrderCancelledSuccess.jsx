@@ -139,7 +139,8 @@ export default function OrderCancelledSuccess({ refundedAmountPence, onDone }) {
             lineHeight: 1.55,
           }}
         >
-          Your refund of <strong style={{ color: '#f0e6d0', fontWeight: 700 }}>{amountLabel}</strong> is being
+          Your refund of{' '}
+          <strong style={{ color: '#f0e6d0', fontWeight: 700 }}>{amountLabel}</strong> is being
           processed. You&apos;ll receive it in a few days.
         </p>
 

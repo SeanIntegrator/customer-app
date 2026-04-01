@@ -8,7 +8,12 @@ export default function Frond({ x = 0, y = 0, size = 44, rotate = 0, delay = 0, 
       transition={{ duration: 5 + delay * 0.8, repeat: Infinity, ease: 'easeInOut', delay }}
     >
       <svg width={size} height={size * 2.4} viewBox="0 0 50 120" fill="none" style={{ opacity }}>
-        <path d="M25 118 C25 100 25 15 25 4" stroke="#6aaa6a" strokeWidth="1.4" strokeLinecap="round" />
+        <path
+          d="M25 118 C25 100 25 15 25 4"
+          stroke="#6aaa6a"
+          strokeWidth="1.4"
+          strokeLinecap="round"
+        />
         {[22, 40, 58, 76, 94].map((cy, i) => {
           const w = 22 - i * 2;
           return (
