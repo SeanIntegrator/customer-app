@@ -117,7 +117,7 @@ export default function OrderSuccess({
         >
           {title}
         </h2>
-        <p
+        {/* <p
           style={{
             fontFamily: 'Plus Jakarta Sans, sans-serif',
             fontSize: 14,
@@ -128,7 +128,7 @@ export default function OrderSuccess({
           }}
         >
           {subline}
-        </p>
+        </p> */}
         {stampLine ? (
           <p
             style={{
