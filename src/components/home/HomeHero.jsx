@@ -23,9 +23,17 @@ export default function HomeHero({
   orderCount: _orderCount = null,
   memberSinceLabel: _memberSinceLabel = null,
 }) {
+  const hasFreeDrinksBubble =
+    isAuthenticated && !loyaltyLoading && loyaltyRewardsAvailable > 0;
+
+  /** Min px values leave room for the loyalty card above HomeBridgingCta’s -42px overlap. Taller when the free-drinks row is shown (adds ~56px to the card). */
   const heroHeight = hidePromotionalChips
-    ? 'clamp(240px, 48vh, 480px)'
-    : 'clamp(280px, 52vh, 560px)';
+    ? hasFreeDrinksBubble
+      ? 'clamp(412px, 50vh, 500px)'
+      : 'clamp(328px, 48vh, 480px)'
+    : hasFreeDrinksBubble
+      ? 'clamp(392px, 54vh, 560px)'
+      : 'clamp(348px, 52vh, 560px)';
   const heroPaddingTop = hidePromotionalChips ? 32 : 40;
   const heroPaddingBottom = hidePromotionalChips ? 20 : 32;
 
@@ -430,26 +438,37 @@ export default function HomeHero({
                   background: 'linear-gradient(165deg, #fffdf8 0%, #f5f0e4 45%, #ebe4d4 100%)',
                   border: '1px solid rgba(26,46,26,0.1)',
                   borderRadius: 20,
-                  padding: '12px 16px',
+                  padding: '10px 14px',
                   cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
                   boxShadow:
                     '0 12px 36px rgba(26,46,26,0.12), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.95)',
                 }}
               >
-                <span style={{ display: 'block', marginBottom: 6 }}>
+                <span style={{ flex: '1 1 auto', minWidth: 0, lineHeight: 1.2 }}>
                   {loyaltyRewardsAvailable} free drink{loyaltyRewardsAvailable === 1 ? '' : 's'}{' '}
                   available
                 </span>
-                <span
-                  style={{
-                    fontFamily: 'Plus Jakarta Sans, sans-serif',
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: 'rgba(26,46,26,0.48)',
-                  }}
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  aria-hidden
+                  style={{ flexShrink: 0, opacity: 0.55 }}
                 >
-                  Redeem at checkout
-                </span>
+                  <path
+                    d="M9 6l6 6-6 6"
+                    stroke="currentColor"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </motion.button>
             ) : null}
           </div>
