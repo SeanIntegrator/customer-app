@@ -176,7 +176,7 @@ export default function HomeHero({
         </svg>
       </div>
 
-      <div style={{ position: 'relative', padding: '0 24px', zIndex: 1 }}>
+      <div className="app-content w-full" style={{ position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -256,11 +256,11 @@ export default function HomeHero({
       <div style={{ flex: hidePromotionalChips ? 0.3 : 0.42 }} />
 
       <motion.div
+        className="app-content w-full"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.22, type: 'spring', stiffness: 260, damping: 28 }}
         style={{
-          padding: '0 18px',
           marginTop: 22,
           marginBottom: 26,
           position: 'relative',
@@ -270,6 +270,7 @@ export default function HomeHero({
         <motion.div
           whileTap={{ scale: 0.982 }}
           onClick={onOpenLoyaltyCard}
+          className="w-full max-w-[min(100%,448px)] mx-auto lg:mx-0"
           style={{
             background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)',
             borderRadius: 20,
@@ -329,7 +330,7 @@ export default function HomeHero({
               </motion.button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, minmax(0, 1fr))', gap: 6 }}>
               {Array.from({ length: loyaltyGoal }).map((_, i) => {
                 const filled = isAuthenticated && !loyaltyLoading && i < loyaltyStamps;
                 const pending =

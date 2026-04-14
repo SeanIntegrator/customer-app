@@ -200,7 +200,9 @@ export default function OrderShell() {
           />
         )}
 
-        <Outlet context={outletContext} />
+        <div className="app-content-max w-full">
+          <Outlet context={outletContext} />
+        </div>
       </div>
 
       <AnimatePresence>

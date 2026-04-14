@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="240" viewBox="0 0 800 240" role="img" aria-hidden="true">
+  <defs>
+    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff4e6"/>
+      <stop offset="100%" stop-color="#e8c9a0"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="240" fill="url(#g)"/>
+  <text x="50%" y="52%" dominant-baseline="middle" text-anchor="middle" font-family="Georgia,serif" font-size="42" fill="#1a2e1a" opacity="0.35">Pastries</text>
+</svg>

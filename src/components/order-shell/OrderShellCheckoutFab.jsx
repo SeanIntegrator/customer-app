@@ -4,7 +4,7 @@ import {
   CHECKOUT_PRIMARY_SHADOW,
   CHECKOUT_PRIMARY_TEXT,
 } from '../../lib/checkoutTheme';
-import { checkoutFabWrap } from '../../styles/orderShellUi';
+import { checkoutFabWrap, checkoutFabInner } from '../../styles/orderShellUi';
 
 function fabLabel(addingToOrderId, editOrderId) {
   if (addingToOrderId != null) return 'Add-ons';
@@ -28,7 +28,8 @@ export default function OrderShellCheckoutFab({
       transition={{ type: 'spring', stiffness: 400, damping: 32 }}
       style={checkoutFabWrap}
     >
-      <motion.button
+      <div style={checkoutFabInner}>
+        <motion.button
         type="button"
         animate={cartBounce ? { scale: [1, 1.05, 0.98, 1] } : { scale: 1 }}
         transition={{ duration: 0.35 }}
@@ -76,6 +77,7 @@ export default function OrderShellCheckoutFab({
           £{(subtotalPence / 100).toFixed(2)}
         </span>
       </motion.button>
+      </div>
     </motion.div>
   );
 }

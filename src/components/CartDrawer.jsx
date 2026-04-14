@@ -17,6 +17,7 @@ import CartDrawerHeader from './cart/CartDrawerHeader';
 import CartDrawerSuccessPane from './cart/CartDrawerSuccessPane';
 import CartDrawerScrollBody from './cart/CartDrawerScrollBody';
 import CartDrawerCheckoutFooter from './cart/CartDrawerCheckoutFooter';
+import CheckoutTransitionOverlay from './CheckoutTransitionOverlay';
 import { DEFAULT_PICKUP_MINUTES, adjustPickupStepper } from '../lib/pickup';
 import {
   previewStampsEarnedForOrderTotal,
@@ -41,6 +42,8 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
     clearAddingToOrder,
     applyReward,
     setApplyReward,
+    pickupMinutes,
+    setPickupMinutes,
   } = useCart();
   const { user, isAuthenticated, authFetch } = useAuth();
   const { loyalty: loyaltyConfig, reward } = useAppConfig();
@@ -50,9 +53,9 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [orderSuccessVariant, setOrderSuccessVariant] = useState('placed');
   const [orderSuccessStampTotalPence, setOrderSuccessStampTotalPence] = useState(null);
-  const [pickupMinutes, setPickupMinutes] = useState(DEFAULT_PICKUP_MINUTES);
   const [showCheckoutSignIn, setShowCheckoutSignIn] = useState(false);
   const [lockedOrder, setLockedOrder] = useState(null);
+  const [checkoutHandoff, setCheckoutHandoff] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated) setShowCheckoutSignIn(false);
@@ -193,7 +196,13 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
             order_id: addingToOrderId,
             additional_line_items: orderLineItemsFromCartItems(items),
           });
-          await redirectToCheckoutWithFallback({ publishableKey: pubKey, sessionId, url });
+          setCheckoutHandoff(true);
+          try {
+            await new Promise((r) => setTimeout(r, 850));
+            await redirectToCheckoutWithFallback({ publishableKey: pubKey, sessionId, url });
+          } finally {
+            setCheckoutHandoff(false);
+          }
         }
       } else if (editOrderId != null) {
         setOrderSuccessVariant('updated');
@@ -234,7 +243,13 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
             allergens: allergensPayload,
             apply_reward: Boolean(applyReward && eligibleForReward && !rewardBelowStripeMin),
           });
-          await redirectToCheckoutWithFallback({ publishableKey: pubKey, sessionId, url });
+          setCheckoutHandoff(true);
+          try {
+            await new Promise((r) => setTimeout(r, 850));
+            await redirectToCheckoutWithFallback({ publishableKey: pubKey, sessionId, url });
+          } finally {
+            setCheckoutHandoff(false);
+          }
         }
       }
     } catch (err) {
@@ -261,91 +276,94 @@ export default function CartDrawer({ open, onClose, onEditLine, orderModifyLocke
   };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => !orderSuccess && handleSheetClose()}
-            className="fixed inset-0 sheet-backdrop z-40"
-          />
+    <>
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => !orderSuccess && handleSheetClose()}
+              className="fixed inset-0 sheet-backdrop z-40"
+            />
 
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', stiffness: 350, damping: 38 }}
-            className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : tallSheet ? 'h-[90vh] max-h-[90vh]' : 'min-h-[75vh] max-h-[90vh]'}`}
-            style={{ background: '#f0e6d0', overflow: 'hidden' }}
-            {...sheetMotionProps}
-          >
-            {orderSuccess ? (
-              <CartDrawerSuccessPane
-                orderSuccessVariant={orderSuccessVariant}
-                onDone={handleSuccessDone}
-                pickupMinutes={pickupMinutes}
-                orderSuccessStampTotalPence={orderSuccessStampTotalPence}
-                onGreenHeaderPointerDown={onGreenHeaderPointerDown}
-              />
-            ) : (
-              <>
-                <CartDrawerHeader
-                  title={
-                    addingToOrderId != null
-                      ? 'Add to order'
-                      : editOrderId != null
-                        ? 'Update order'
-                        : 'Your order'
-                  }
-                  onClose={handleSheetClose}
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 350, damping: 38 }}
+              className={`fixed bottom-0 left-0 right-0 rounded-t-3xl z-50 flex flex-col ${orderSuccess ? 'h-[70vh]' : tallSheet ? 'h-[90vh] max-h-[90vh]' : 'min-h-[75vh] max-h-[90vh]'}`}
+              style={{ background: '#f0e6d0', overflow: 'hidden' }}
+              {...sheetMotionProps}
+            >
+              {orderSuccess ? (
+                <CartDrawerSuccessPane
+                  orderSuccessVariant={orderSuccessVariant}
+                  onDone={handleSuccessDone}
+                  pickupMinutes={pickupMinutes}
+                  orderSuccessStampTotalPence={orderSuccessStampTotalPence}
                   onGreenHeaderPointerDown={onGreenHeaderPointerDown}
                 />
+              ) : (
+                <>
+                  <CartDrawerHeader
+                    title={
+                      addingToOrderId != null
+                        ? 'Add to order'
+                        : editOrderId != null
+                          ? 'Update order'
+                          : 'Your order'
+                    }
+                    onClose={handleSheetClose}
+                    onGreenHeaderPointerDown={onGreenHeaderPointerDown}
+                  />
 
-                <CartDrawerScrollBody
-                  basketLocked={basketLocked}
-                  isUpdateEditMode={isUpdateEditMode}
-                  existingItems={existingItems}
-                  newItems={newItems}
-                  lineEditsBlocked={lineEditsBlocked}
-                  onEditLine={onEditLine}
-                  updateQuantity={updateQuantity}
-                  addingToOrderId={addingToOrderId}
-                  lockedOrder={lockedOrder}
-                  items={items}
-                  cartStampPreviewLine={cartStampPreviewLine}
-                />
-                <CartDrawerCheckoutFooter
-                  showCheckoutSignIn={showCheckoutSignIn}
-                  setShowCheckoutSignIn={setShowCheckoutSignIn}
-                  error={error}
-                  isUpdateEditMode={isUpdateEditMode}
-                  existingSubtotal={existingSubtotal}
-                  newSubtotal={newSubtotal}
-                  eligibleForReward={eligibleForReward}
-                  rewardDiscountPence={rewardDiscountPence}
-                  reward={reward}
-                  loyaltyConfig={loyaltyConfig}
-                  items={items}
-                  rewardBelowStripeMin={rewardBelowStripeMin}
-                  applyReward={applyReward}
-                  setApplyReward={setApplyReward}
-                  STRIPE_MIN_CHECKOUT_PENCE={STRIPE_MIN_CHECKOUT_PENCE}
-                  displayTotalPence={displayTotalPence}
-                  addingToOrderId={addingToOrderId}
-                  editOrderId={editOrderId}
-                  basketLocked={basketLocked}
-                  pickupMinutes={pickupMinutes}
-                  adjustPickup={adjustPickup}
-                  handlePlaceOrder={handlePlaceOrder}
-                  submitting={submitting}
-                />
-              </>
-            )}
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+                  <CartDrawerScrollBody
+                    basketLocked={basketLocked}
+                    isUpdateEditMode={isUpdateEditMode}
+                    existingItems={existingItems}
+                    newItems={newItems}
+                    lineEditsBlocked={lineEditsBlocked}
+                    onEditLine={onEditLine}
+                    updateQuantity={updateQuantity}
+                    addingToOrderId={addingToOrderId}
+                    lockedOrder={lockedOrder}
+                    items={items}
+                    cartStampPreviewLine={cartStampPreviewLine}
+                  />
+                  <CartDrawerCheckoutFooter
+                    showCheckoutSignIn={showCheckoutSignIn}
+                    setShowCheckoutSignIn={setShowCheckoutSignIn}
+                    error={error}
+                    isUpdateEditMode={isUpdateEditMode}
+                    existingSubtotal={existingSubtotal}
+                    newSubtotal={newSubtotal}
+                    eligibleForReward={eligibleForReward}
+                    rewardDiscountPence={rewardDiscountPence}
+                    reward={reward}
+                    loyaltyConfig={loyaltyConfig}
+                    items={items}
+                    rewardBelowStripeMin={rewardBelowStripeMin}
+                    applyReward={applyReward}
+                    setApplyReward={setApplyReward}
+                    STRIPE_MIN_CHECKOUT_PENCE={STRIPE_MIN_CHECKOUT_PENCE}
+                    displayTotalPence={displayTotalPence}
+                    addingToOrderId={addingToOrderId}
+                    editOrderId={editOrderId}
+                    basketLocked={basketLocked}
+                    pickupMinutes={pickupMinutes}
+                    adjustPickup={adjustPickup}
+                    handlePlaceOrder={handlePlaceOrder}
+                    submitting={submitting}
+                  />
+                </>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+      <CheckoutTransitionOverlay open={checkoutHandoff} />
+    </>
   );
 }

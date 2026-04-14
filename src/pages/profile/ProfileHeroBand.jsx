@@ -130,7 +130,7 @@ export default function ProfileHeroBand({
         </svg>
       </motion.div>
 
-      <div style={{ position: 'relative', padding: '0 22px' }}>
+      <div className="app-content w-full" style={{ position: 'relative' }}>
         <p
           style={{
             fontFamily: 'Plus Jakarta Sans, sans-serif',

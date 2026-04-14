@@ -51,7 +51,7 @@ function StarRow({ value, onChange }) {
  * @param {string | number} props.orderId
  * @param {typeof fetch} props.fetchImpl
  * @param {() => void} props.onClose
- * @param {(result: { rating: number, shouldShowGooglePrompt: boolean, googleReviewUrl: string }) => void} props.onComplete
+ * @param {(result: { rating: number, googleReviewUrl: string }) => void} props.onComplete
  */
 export default function FeedbackModal({ isOpen, orderId, fetchImpl, onClose, onComplete }) {
   const [rating, setRating] = useState(null);
@@ -123,7 +123,6 @@ export default function FeedbackModal({ isOpen, orderId, fetchImpl, onClose, onC
       });
       onComplete({
         rating,
-        shouldShowGooglePrompt: result.shouldShowGooglePrompt,
         googleReviewUrl: result.googleReviewUrl,
       });
     } catch (e) {
@@ -248,12 +247,25 @@ export default function FeedbackModal({ isOpen, orderId, fetchImpl, onClose, onC
                 color: GREEN,
                 letterSpacing: '-0.03em',
                 textAlign: 'center',
-                margin: '0 0 20px',
+                margin: '0 0 8px',
                 lineHeight: 1.2,
               }}
             >
               How was your order?
             </h2>
+            <p
+              style={{
+                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'rgba(26,46,26,0.52)',
+                textAlign: 'center',
+                margin: '0 0 18px',
+                lineHeight: 1.45,
+              }}
+            >
+              Private feedback for our team — not your Google review.
+            </p>
 
             <StarRow value={rating} onChange={setRating} />
 

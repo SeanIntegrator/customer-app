@@ -6,6 +6,8 @@
     --color-border-warm: #d4c0a0;
     --radius-card: 20px;
     --radius-pill: 999px;
+    --app-content-max: 1024px;
+    --app-content-gutter: 18px;
   }
 }
 

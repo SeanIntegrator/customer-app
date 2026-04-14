@@ -3,11 +3,17 @@
  * Square category names are mapped here (see menuBucketSlugForSquareCategory).
  */
 
+/** @typedef {{ slug: string, label: string, headerImage: string }} MenuBucketDef */
+
+/**
+ * `headerImage` paths live under `public/icons/categories/` — swap SVGs when brand assets are ready.
+ * @type {MenuBucketDef[]}
+ */
 export const MENU_BUCKETS = [
-  { slug: 'matcha', label: 'Matcha' },
-  { slug: 'hot-drinks', label: 'Hot drinks' },
-  { slug: 'iced-drinks', label: 'Iced drinks' },
-  { slug: 'pastries', label: 'Pastries' },
+  { slug: 'matcha', label: 'Matcha', headerImage: '/icons/categories/matcha.svg' },
+  { slug: 'hot-drinks', label: 'Hot drinks', headerImage: '/icons/categories/hot-drinks.svg' },
+  { slug: 'iced-drinks', label: 'Iced drinks', headerImage: '/icons/categories/iced-drinks.svg' },
+  { slug: 'pastries', label: 'Pastries', headerImage: '/icons/categories/pastries.svg' },
 ];
 
 const OTHER_SLUG = 'other';
@@ -45,4 +51,11 @@ export function isDrinkLoyaltyCategory(
   drinkCategorySlugs = DEFAULT_REWARD_DRINK_CATEGORY_SLUGS
 ) {
   return Array.isArray(drinkCategorySlugs) && drinkCategorySlugs.includes(slug);
+}
+
+const DRINK_MENU_SLUGS = new Set(['matcha', 'hot-drinks', 'iced-drinks']);
+
+/** True when item detail should show drink modifiers (milk, size, etc.). */
+export function showDrinkModifiersForMenuBucket(menuBucketSlug) {
+  return DRINK_MENU_SLUGS.has(menuBucketSlug);
 }

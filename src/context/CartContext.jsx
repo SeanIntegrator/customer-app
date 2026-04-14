@@ -1,5 +1,9 @@
-import { createContext, useContext, useCallback, useMemo } from 'react';
+import { createContext, useContext, useCallback, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  clearPersistedCheckoutCart,
+  writePersistedCheckoutCart,
+} from '../lib/cartLocalStorage';
 import { getEnrichedCatalog } from '../lib/catalogEnrich';
 import { useCartLinesDomain } from './cart/useCartLinesDomain';
 import { useOrderLifecycleDomain } from './cart/useOrderLifecycleDomain';
@@ -44,7 +48,10 @@ export function CartProvider({ children }) {
     setItems,
     applyReward,
     setApplyReward,
+    pickupMinutes,
+    setPickupMinutes,
   } = cartLines;
+
   const {
     activeOrder,
     setActiveOrder,
@@ -57,6 +64,14 @@ export function CartProvider({ children }) {
     suppressNavBasketForPaidGoldCard,
     setSuppressNavBasketForPaidGoldCard,
   } = orderLifecycle;
+
+  useEffect(() => {
+    if (editOrderId != null || addingToOrderId != null) {
+      clearPersistedCheckoutCart();
+      return;
+    }
+    writePersistedCheckoutCart({ items, applyReward, pickupMinutes });
+  }, [items, applyReward, pickupMinutes, editOrderId, addingToOrderId]);
   const {
     postCheckoutFeedbackOrderId,
     beginPostCheckoutFeedback,
@@ -69,6 +84,7 @@ export function CartProvider({ children }) {
   const loadCartFromOrderEdit = useCallback(
     async (apiOrder) => {
       if (!apiOrder?.id) return;
+      clearPersistedCheckoutCart();
       setAddingToOrderId(null);
       setApplyReward(false);
       setEditOrderId(apiOrder.id);
@@ -118,6 +134,7 @@ export function CartProvider({ children }) {
   const startAddingToOrder = useCallback(
     (orderId) => {
       if (orderId == null) return;
+      clearPersistedCheckoutCart();
       setEditOrderId(null);
       setApplyReward(false);
       setAddingToOrderId(Number(orderId));
@@ -172,6 +189,8 @@ export function CartProvider({ children }) {
       setSuppressNavBasketForPaidGoldCard,
       applyReward,
       setApplyReward,
+      pickupMinutes,
+      setPickupMinutes,
     }),
     [
       items,
@@ -204,6 +223,8 @@ export function CartProvider({ children }) {
       setSuppressNavBasketForPaidGoldCard,
       applyReward,
       setApplyReward,
+      pickupMinutes,
+      setPickupMinutes,
     ]
   );
 

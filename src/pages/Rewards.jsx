@@ -53,7 +53,7 @@ export default function Rewards() {
       className="h-full overflow-y-auto scrollbar-hide"
       style={{ background: '#f0e6d0', minHeight: '100%' }}
     >
-      <div style={{ padding: '20px 18px 100px' }}>
+      <div className="app-content w-full" style={{ paddingTop: 20, paddingBottom: 100 }}>
         <button
           type="button"
           onClick={() => navigate(-1)}

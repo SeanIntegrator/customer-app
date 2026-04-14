@@ -8,20 +8,20 @@ export function cartHasEligibleDrinkForReward(items, drinkCategorySlugs) {
   return items.some((i) => i && isDrinkLoyaltyCategory(i.category, drinkCategorySlugs));
 }
 
-/** Cheapest drink line total in basket; discount preview = min(line, cap). */
+/** Cheapest single drink unit price in basket; discount = min(that, cap). One reward covers one drink. */
 export function computeRewardDiscountPenceForCart(
   items,
   rewardMaxPence = REWARD_MAX_PENCE,
   drinkCategorySlugs
 ) {
   if (!Array.isArray(items)) return 0;
-  let minLine = null;
+  let minUnit = null;
   for (const i of items) {
     if (!i || !isDrinkLoyaltyCategory(i.category, drinkCategorySlugs)) continue;
-    const line = Number(i.totalPrice) * Number(i.quantity || 1);
-    if (!Number.isFinite(line)) continue;
-    if (minLine == null || line < minLine) minLine = line;
+    const unit = Number(i.totalPrice);
+    if (!Number.isFinite(unit)) continue;
+    if (minUnit == null || unit < minUnit) minUnit = unit;
   }
-  if (minLine == null) return 0;
-  return Math.min(Math.round(minLine), rewardMaxPence);
+  if (minUnit == null) return 0;
+  return Math.min(Math.round(minUnit), rewardMaxPence);
 }

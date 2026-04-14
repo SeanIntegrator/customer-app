@@ -1,4 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
+import { clearPersistedCheckoutCart, readPersistedCheckoutCart } from '../../lib/cartLocalStorage';
+import { DEFAULT_PICKUP_MINUTES } from '../../lib/pickup';
 
 function lineDedupeKey(i) {
   const altKey = (x) => (x.alterations ?? []).slice().sort().join(',');
@@ -6,10 +8,19 @@ function lineDedupeKey(i) {
   return `${i.catalogObjectId}|${i.size}|${i.milk}|${i.syrup ?? 'none'}|${altKey(i)}|${note}`;
 }
 
+function initialPersistedSnapshot() {
+  if (typeof window === 'undefined') return null;
+  return readPersistedCheckoutCart();
+}
+
 export function useCartLinesDomain() {
-  const [items, setItems] = useState([]);
+  const boot = initialPersistedSnapshot();
+  const [items, setItems] = useState(() => boot?.items ?? []);
   const [orderAllergens, setOrderAllergens] = useState([]);
-  const [applyReward, setApplyReward] = useState(false);
+  const [applyReward, setApplyReward] = useState(() => boot?.applyReward ?? false);
+  const [pickupMinutes, setPickupMinutes] = useState(
+    () => boot?.pickupMinutes ?? DEFAULT_PICKUP_MINUTES
+  );
 
   const addItem = useCallback((item) => {
     setItems((prev) => {
@@ -63,6 +74,8 @@ export function useCartLinesDomain() {
     setItems([]);
     setOrderAllergens([]);
     setApplyReward(false);
+    setPickupMinutes(DEFAULT_PICKUP_MINUTES);
+    clearPersistedCheckoutCart();
   }, []);
 
   const totalItems = useMemo(() => items.reduce((s, i) => s + i.quantity, 0), [items]);
@@ -76,6 +89,8 @@ export function useCartLinesDomain() {
       setOrderAllergens,
       applyReward,
       setApplyReward,
+      pickupMinutes,
+      setPickupMinutes,
       addItem,
       removeItem,
       updateQuantity,
@@ -88,6 +103,7 @@ export function useCartLinesDomain() {
       items,
       orderAllergens,
       applyReward,
+      pickupMinutes,
       totalItems,
       subtotal,
       addItem,

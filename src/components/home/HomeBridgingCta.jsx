@@ -15,7 +15,7 @@ export default function HomeBridgingCta({
 }) {
   const showBasketCta = basketUnpaidQty > 0;
   return (
-    <div style={{ margin: '-42px 18px 6px', position: 'relative', zIndex: 10 }}>
+    <div style={{ margin: '-42px 0 6px', position: 'relative', zIndex: 10 }}>
       <AnimatePresence mode="wait">
         {bridgingCtaLoading ? (
           <motion.div

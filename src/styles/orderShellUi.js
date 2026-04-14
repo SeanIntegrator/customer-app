@@ -7,7 +7,7 @@ export const orderShellScrollArea = { WebkitOverflowScrolling: 'touch' };
 export const menuHeroOuter = {
   background: 'linear-gradient(155deg, #0e1c0e 0%, #1a2e1a 55%, #223828 100%)',
   position: 'relative',
-  padding: '10px 16px 14px',
+  padding: '10px 0 14px',
   paddingTop: 'calc(10px + env(safe-area-inset-top, 0px))',
   overflow: 'hidden',
 };
@@ -57,11 +57,7 @@ export const menuSubtitle = {
 };
 
 export const inProgressBanner = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 10,
-  padding: '10px 16px',
+  padding: '10px 0',
   background: 'linear-gradient(128deg, #c8902a 0%, #d4a030 55%, #debc4a 100%)',
   borderBottom: '1px solid rgba(18,32,18,0.12)',
   boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
@@ -94,11 +90,23 @@ export const inProgressCartBtn = {
   cursor: 'pointer',
 };
 
+/** Outer strip: full width, centers the FAB. Inner child sets max width. */
 export const checkoutFabWrap = {
   position: 'absolute',
   bottom: 12,
-  left: 16,
-  right: 16,
+  left: 0,
+  right: 0,
   zIndex: 30,
+  display: 'flex',
+  justifyContent: 'center',
+  paddingLeft: 16,
+  paddingRight: 16,
   paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+  pointerEvents: 'none',
+};
+
+export const checkoutFabInner = {
+  width: '100%',
+  maxWidth: 'var(--app-content-max)',
+  pointerEvents: 'auto',
 };

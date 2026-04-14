@@ -173,7 +173,10 @@ export default function Profile() {
         logout={logout}
       />
       {/* ── PAGE BODY ─────────────────────────────────────────────── */}
-      <div style={{ padding: '32px 18px 72px', display: 'flex', flexDirection: 'column', gap: 36 }}>
+      <div
+        className="app-content w-full"
+        style={{ paddingTop: 32, paddingBottom: 72, display: 'flex', flexDirection: 'column', gap: 36 }}
+      >
         {!loading && !isAuthenticated && <ProfileGuestSignInSection />}
 
         <ProfileActiveOrderCard activeOrder={activeOrder} onDismiss={clearActiveOrder} />
@@ -187,6 +190,7 @@ export default function Profile() {
           <SectionHead label="Rewards" title="Your loyalty card" />
 
           <div
+            className="w-full max-w-[min(100%,448px)] mx-auto lg:mx-0"
             style={{
               background: 'linear-gradient(148deg, #faf2e2 0%, #f2e4cc 100%)',
               borderRadius: 24,
@@ -247,7 +251,7 @@ export default function Profile() {
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: 'repeat(9, 1fr)',
+                    gridTemplateColumns: 'repeat(9, minmax(0, 1fr))',
                     gap: 6,
                     marginBottom: 12,
                   }}

@@ -33,6 +33,26 @@
 }
 
 @layer utilities {
+  /* Centered column on large screens; full width below --app-content-max */
+  .app-content {
+    width: 100%;
+    max-width: var(--app-content-max);
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: var(--app-content-gutter);
+    padding-right: var(--app-content-gutter);
+    box-sizing: border-box;
+  }
+
+  /* Centered max width only (children supply their own horizontal padding) */
+  .app-content-max {
+    width: 100%;
+    max-width: var(--app-content-max);
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+  }
+
   .font-display {
     font-family: 'Fraunces', Georgia, serif;
   }

@@ -1,6 +1,16 @@
 import { fetchCatalogItems } from './api';
 import { isRetailSquareCategory, showDrinkModifiersForCategory } from './categorySlug';
-import { MENU_BUCKETS, menuBucketSlugForSquareCategory } from './menuBuckets';
+import {
+  MENU_BUCKETS,
+  menuBucketSlugForSquareCategory,
+  showDrinkModifiersForMenuBucket,
+} from './menuBuckets';
+import {
+  foodSubCategoryForPastriesItem,
+  isLikelyStandaloneModifierItem,
+  menuBucketOverrideForItemName,
+} from './catalogFilters';
+import { resolveItemIconUrl } from '../data/itemIcons';
 import { getPriceForItem, getEmojiForItem } from '../data/mock';
 
 /**
@@ -8,7 +18,10 @@ import { getPriceForItem, getEmojiForItem } from '../data/mock';
  * Drops £0 items (pence ≤ 0) — admin / comp SKUs not shown in order-ahead.
  */
 export function enrichCatalogRaw(raw) {
-  const filtered = raw.filter((item) => !isRetailSquareCategory(item.categoryName));
+  const filtered = raw.filter(
+    (item) =>
+      !isRetailSquareCategory(item.categoryName) && !isLikelyStandaloneModifierItem(item.name)
+  );
 
   /** @type {Record<string, { categorySlug: string, squareCategoryName: string | null, showDrinkModifiers: boolean }>} */
   const variationById = {};
@@ -20,16 +33,24 @@ export function enrichCatalogRaw(raw) {
 
     const squareCategoryName = item.categoryName?.trim() ?? null;
     const categoryId = item.categoryId ?? null;
-    const menuBucket = menuBucketSlugForSquareCategory(squareCategoryName);
-    const showDrinkModifiers = showDrinkModifiersForCategory(squareCategoryName);
+    const menuBucket =
+      menuBucketOverrideForItemName(item.name) ?? menuBucketSlugForSquareCategory(squareCategoryName);
+    const showDrinkModifiers = showDrinkModifiersForMenuBucket(menuBucket)
+      ? true
+      : showDrinkModifiersForCategory(squareCategoryName);
+    const foodSubCategory =
+      menuBucket === 'pastries' ? foodSubCategoryForPastriesItem(item.name) : null;
+    const iconUrl = resolveItemIconUrl({ catalogObjectId: item.id, name: item.name });
     const enriched = {
       catalogObjectId: item.id,
       name: item.name,
       price: pricePence,
       emoji: getEmojiForItem(item.name),
+      iconUrl,
       squareCategoryName,
       categoryId,
       category: menuBucket,
+      foodSubCategory,
       showDrinkModifiers,
     };
     items.push(enriched);
@@ -44,8 +65,22 @@ export function enrichCatalogRaw(raw) {
 
   const hasOther = items.some((i) => i.category === 'other');
   const menuCategories = [
-    ...MENU_BUCKETS.map(({ slug, label }) => ({ slug, label, categoryId: null })),
-    ...(hasOther ? [{ slug: 'other', label: 'Other', categoryId: null }] : []),
+    ...MENU_BUCKETS.map(({ slug, label, headerImage }) => ({
+      slug,
+      label,
+      headerImage,
+      categoryId: null,
+    })),
+    ...(hasOther
+      ? [
+          {
+            slug: 'other',
+            label: 'Other',
+            headerImage: '/icons/categories/other.svg',
+            categoryId: null,
+          },
+        ]
+      : []),
   ];
 
   return { items, menuCategories, variationById };

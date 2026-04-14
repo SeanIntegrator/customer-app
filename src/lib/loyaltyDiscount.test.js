@@ -19,4 +19,15 @@ describe('loyaltyDiscount', () => {
       )
     ).toBe(REWARD_MAX_PENCE);
   });
+
+  it('uses single drink unit price when quantity > 1 (one reward = one drink)', () => {
+    const items = [{ category: 'hot-drinks', totalPrice: 400, quantity: 3 }];
+    expect(
+      computeRewardDiscountPenceForCart(
+        items,
+        REWARD_MAX_PENCE,
+        DEFAULT_REWARD_DRINK_CATEGORY_SLUGS
+      )
+    ).toBe(400);
+  });
 });

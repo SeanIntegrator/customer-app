@@ -3,6 +3,9 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
+      maxWidth: {
+        app: 'var(--app-content-max)',
+      },
       colors: {
         cream: '#f1f3e6',
         'warm-white': '#faf9f4',

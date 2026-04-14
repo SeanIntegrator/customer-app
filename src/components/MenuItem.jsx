@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 
 export default function MenuItem({
@@ -9,6 +10,7 @@ export default function MenuItem({
   /** When false, basket lines are a normal pre-checkout cart (label "in cart"). */
   orderEditMode = false,
 }) {
+  const [iconFailed, setIconFailed] = useState(false);
   const pricePounds = (item.price / 100).toFixed(2);
   const hasBasket = basketQty > 0;
   const hasOrdered = orderedQty > 0;
@@ -107,7 +109,18 @@ export default function MenuItem({
             )}
           </div>
         )}
-        <span style={{ fontSize: 38, lineHeight: 1 }}>{item.emoji}</span>
+        {item.iconUrl && !iconFailed ? (
+          <img
+            src={item.iconUrl}
+            alt=""
+            width={72}
+            height={72}
+            style={{ width: 72, height: 72, objectFit: 'contain' }}
+            onError={() => setIconFailed(true)}
+          />
+        ) : (
+          <span style={{ fontSize: 38, lineHeight: 1 }}>{item.emoji}</span>
+        )}
       </div>
 
       {/* Bottom section — name + price */}

@@ -179,7 +179,6 @@ export async function submitOrderFeedback(fetchImpl, body) {
   });
   const data = await expectApiSuccess(res, { fallbackError: 'Could not send feedback' });
   return {
-    shouldShowGooglePrompt: Boolean(data.shouldShowGooglePrompt),
     googleReviewUrl: data.googleReviewUrl || GOOGLE_REVIEW_PLACE_URL,
   };
 }

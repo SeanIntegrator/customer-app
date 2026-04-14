@@ -4,7 +4,6 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import FeedbackModal from './FeedbackModal';
 import GoogleReviewPrompt from './GoogleReviewPrompt';
-import Toast from './Toast';
 import { GOOGLE_REVIEW_PLACE_URL } from '../lib/api';
 import { useOrderEvents } from '../context/OrderEventsContext';
 
@@ -17,7 +16,6 @@ export default function PostOrderFeedbackLayer() {
 
   const [googleOpen, setGoogleOpen] = useState(false);
   const [googleUrl, setGoogleUrl] = useState(GOOGLE_REVIEW_PLACE_URL);
-  const [apologyToastVisible, setApologyToastVisible] = useState(false);
   const applyKdsRef = useRef(applyKdsOrderCompleted);
   applyKdsRef.current = applyKdsOrderCompleted;
 
@@ -33,21 +31,12 @@ export default function PostOrderFeedbackLayer() {
   }, [clearPostCheckoutFeedback, navigate]);
 
   const handleFeedbackComplete = useCallback(
-    ({ shouldShowGooglePrompt, googleReviewUrl }) => {
+    ({ googleReviewUrl }) => {
       clearPostCheckoutFeedback();
-      const url = googleReviewUrl || GOOGLE_REVIEW_PLACE_URL;
-      setGoogleUrl(url);
-
-      if (shouldShowGooglePrompt) {
-        setGoogleOpen(true);
-        return;
-      }
-
-      setApologyToastVisible(true);
-      window.setTimeout(() => setApologyToastVisible(false), 4800);
-      navigate('/', { replace: true });
+      setGoogleUrl(googleReviewUrl || GOOGLE_REVIEW_PLACE_URL);
+      setGoogleOpen(true);
     },
-    [clearPostCheckoutFeedback, navigate]
+    [clearPostCheckoutFeedback]
   );
 
   const handleLeaveReview = useCallback(() => {
@@ -93,11 +82,6 @@ export default function PostOrderFeedbackLayer() {
         isOpen={googleOpen}
         onLeaveReview={handleLeaveReview}
         onMaybeLater={handleMaybeLater}
-      />
-      <Toast
-        message="We're sorry we didn't hit the mark. Your feedback helps us improve."
-        type="success"
-        visible={apologyToastVisible}
       />
     </>
   );

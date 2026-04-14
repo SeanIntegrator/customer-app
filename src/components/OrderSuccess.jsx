@@ -26,9 +26,6 @@ export default function OrderSuccess({
 }) {
   const updated = variant === 'updated';
   const title = updated ? 'Order successfully updated' : 'Order placed!';
-  const subline = updated
-    ? 'Your baristas have your latest order.'
-    : 'Your order is with the baristas.';
   const stampLine = Number.isFinite(Number(stampPreviewTotalPence))
     ? futureStampLine(Number(stampPreviewTotalPence))
     : null;
@@ -117,18 +114,6 @@ export default function OrderSuccess({
         >
           {title}
         </h2>
-        {/* <p
-          style={{
-            fontFamily: 'Plus Jakarta Sans, sans-serif',
-            fontSize: 14,
-            color: 'rgba(240,230,208,0.6)',
-            marginBottom: 4,
-            margin: '0 0 4px',
-            lineHeight: 1.5,
-          }}
-        >
-          {subline}
-        </p> */}
         {stampLine ? (
           <p
             style={{

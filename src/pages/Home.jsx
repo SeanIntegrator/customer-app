@@ -192,33 +192,35 @@ export default function Home() {
         }
       />
 
-      <HomeBridgingCta
-        bridgingCtaLoading={bridgingCtaLoading}
-        goldCardModel={goldCardModel}
-        basketUnpaidQty={basketUnpaidQty}
-        navigate={navigate}
-        onEditOrderTap={(id) => {
-          setEditingOrderId(id);
-          setEditOrderOpen(true);
-        }}
-        onAddMoreTap={async () => {
-          if (goldCardModel?.id == null) return;
-          try {
-            if (goldCardModel.is_paid_via_stripe) {
-              startAddingToOrder(goldCardModel.id);
-              return;
+      <div className="app-content w-full">
+        <HomeBridgingCta
+          bridgingCtaLoading={bridgingCtaLoading}
+          goldCardModel={goldCardModel}
+          basketUnpaidQty={basketUnpaidQty}
+          navigate={navigate}
+          onEditOrderTap={(id) => {
+            setEditingOrderId(id);
+            setEditOrderOpen(true);
+          }}
+          onAddMoreTap={async () => {
+            if (goldCardModel?.id == null) return;
+            try {
+              if (goldCardModel.is_paid_via_stripe) {
+                startAddingToOrder(goldCardModel.id);
+                return;
+              }
+              const o = await fetchCustomerOrder(authFetch, goldCardModel.id);
+              loadCartFromOrderEdit(o);
+              navigate('/order');
+            } catch (e) {
+              console.error(e);
             }
-            const o = await fetchCustomerOrder(authFetch, goldCardModel.id);
-            loadCartFromOrderEdit(o);
-            navigate('/order');
-          } catch (e) {
-            console.error(e);
-          }
-        }}
-        onCancelTap={() => setCancelModalOpen(true)}
-      />
+          }}
+          onCancelTap={() => setCancelModalOpen(true)}
+        />
+      </div>
 
-      <div style={{ padding: '0 18px 56px', marginTop: 36 }}>
+      <div className="app-content w-full" style={{ paddingBottom: 56, marginTop: 36 }}>
         <div
           style={{
             background: '#f0e6d0',
